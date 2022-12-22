@@ -61,7 +61,7 @@ Link posts are saved as HTML files that can be opened in a web browser. The HTML
 
 For example, if there was a post that went to `https://www.google.com/` then the HTML file contents would be this:
 
-`<html><body><script type='text/javascript'>window.location.href = "https://www.google.com/";</script></body></html>
+` <html><body><script type='text/javascript'>window.location.href = "https://www.google.com/";</script></body></html>`
 
 ## FAQ
 #### Is there any authentication needed?
