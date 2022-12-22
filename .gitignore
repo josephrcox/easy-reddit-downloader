@@ -125,3 +125,9 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# user downloads
+downloads
+
+# testing
+testing_folder
