@@ -1,5 +1,5 @@
-# reddit_post_downloader
-A NodeJS-based Reddit post downloader utilizing only the public Reddit API
+# reddit-downloaded by mapleweekend
+*A NodeJS-based Reddit post downloader utilizing only the public Reddit API.*
 
 ## Setup
 After cloning the repo, and installing NodeJS, you must install all of the node modules. `cd` into the repo and type the command below. 
