@@ -23,7 +23,7 @@ let time = "all";
 let repeatForever = false;
 let imageDir = "";
 
-const testingMode = true;
+const testingMode = false;
 if (testingMode) {
   subredditList = ['random'];
   numberOfPosts = 10;
