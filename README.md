@@ -82,6 +82,17 @@ This means no oauth is required and it's easy for anyone with an internet connec
 - Most video or image-video formats (tested with MP4, GIF, GIFV which converts to MP4, MOV)
 - Any link post (which generates an HTML file that redirects the user to the link page)
 
+#### Do I need to enter the "/r/" or "r/" before a subreddit name?
+No.
+
+#### Why am I asked how many posts to dig through? What does this number mean?
+The higher the number the....
+- More posts you will download
+- More data you will use (keep in mind if on a data-limited plan)
+- Less subreddits you will download/second
+
+Keep in mind that the number you enter is per subreddit. So if you enter `askreddit,news` and `15` for the post-count number, then it will download 15 posts from /r/askreddit and 15 posts from /r/news. 
+
 #### Is there any tracking with what I download?
 No. There is no Google analytics or other tracking that goes into the posts or subreddits that you choose to download. 
 
@@ -93,6 +104,9 @@ No.
 
 #### Can I run this on my computer?
 Any computer that can run NodeJS can run this, although a stable internet connection and room for the posts to download will decrease the chance of random errors. If you face problems, submit an issue!
+
+#### Why did you (mapleweekend) make this?
+In the past, I have wanted to download subreddits for offline consumption. This makes it easy to do so and does not need OAUTH which I found annoying with many other tools. I also just wanted a fun tiny project to work on during vacation so I spent a couple of hours making and refining this. 
 
 ## Upcoming features
 Please see the issues tab to see upcoming features and vote on what you want the most. 
