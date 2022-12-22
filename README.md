@@ -25,7 +25,8 @@ After the script begins, you will be asked a few questions about what you want t
 #### testingMode / dev mode
 There is a testingMode that you can use if you would like to skip the prompts and just hard code in the data. If you would like to do so, making sure to change `testingMode` to `true` and then run the script like normal. 
 
-## Text/self posts guide
+## Post types
+### Text/self posts
 All self posts are stored as `txt` files which contain the full title, the author of the post, and the post description. 
 
 It also downloads the parent comments on the post, as well as the top nested comments beneathe that. Here is an example snippet from one post:
@@ -50,10 +51,10 @@ The karmaceutical companies would be outraged.
 
 ```
 
-## Media posts
+### Media posts
 Many media formats are supported including JPG, PNG, JPEG, GIF, GIFv, MP4, and MOV. These are downloaded in their original format, except for GIF and GIFv which are converted in real-time to MP4 format. There is sometimes a slight loss in quality here but its not noticble in my testing, with the added benefit of being able to scrub through the GIF. 
 
-## Link posts
+### Link posts
 Link posts are saved as HTML files that can be opened in a web browser. The HTML file is basic and immediately redirects the user with Javascript to the webpage of the link. 
 
 For example, if there was a post that went to `https://www.google.com/` then the HTML file contents would be this:
