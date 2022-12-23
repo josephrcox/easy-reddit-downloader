@@ -29,7 +29,7 @@ There is a testingMode that you can use if you would like to skip the prompts an
 
 ## Post types
 ### Text/self posts
-All self posts are stored as `txt` files which contain the full title, the author of the post, and the post description. 
+All self posts are stored as `md` (markdown) files which contain the full title, the author of the post, and the post description. 
 
 It also downloads the parent comments on the post, as well as the top nested comments beneathe that. Here is an example snippet from one post:
 ```
