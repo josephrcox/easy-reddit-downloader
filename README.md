@@ -14,7 +14,9 @@
 8. Local logging so you can see what you downloaded in the past and the developer logs
 
 ## Setup & Usage
-After cloning the repo, and installing NodeJS, you must install all of the node modules. `cd` into the repo and type the command below. 
+1. Clone or download this repo
+2. Install NodeJS from https://nodejs.org/en/download/ (if you don't already have it)
+3. Install all of the node dependencies. `cd` into the repo and type the command below. 
 
 `npm i`
 
