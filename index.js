@@ -17,7 +17,8 @@ let startTime = null;
 
 // Start actions
 console.clear(); // Clear the console
-log(chalk.cyan('Welcome to Reddit Post Downloader by Mapleweekend!'), true); 
+log(chalk.cyan('Welcome to Reddit Post Downloader!'), true); 
+log(chalk.red('Contribute @ https://github.com/mapleweekend/easy-reddit-downloader'), true); 
 
 // User-defined variables, these can be preset with the help of testingMode
 let timeBetweenRuns = 0; // in milliseconds, the time between runs. This is only used if repeatForever is true
