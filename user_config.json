@@ -1,0 +1,6 @@
+{
+    "testingMode": false,
+    "download_self_posts": true,
+    "download_media_posts": true,
+    "download_link_posts": true
+}
