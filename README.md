@@ -26,8 +26,8 @@ Then, you are ready to go! Type either of the commands below to start it up.
 
 After the script begins, you will be asked a few questions about what you want to download. Fill out the questions (be careful not to have any typos) and it will download all post types from the subreddit(s) you entered with your sorting options. 
 
-#### testingMode / dev mode
-There is a testingMode that you can use if you would like to skip the prompts and just hard code in the data. If you would like to do so, making sure to change `testingMode` to `true` and then run the script like normal. 
+#### user_config.json
+To configure your user settings, go into the user_config.json file and save it! Make sure the variable types stay the same. For booleans (true,false) don't change a value to `1` or `"hello"`.
 
 ## Post types
 ### Text/self posts
