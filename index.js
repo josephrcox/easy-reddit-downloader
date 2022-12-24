@@ -12,9 +12,7 @@ const config = require('./user_config.json');
 let userLogs = '';
 const logFormat = 'txt';
 let date = new Date();
-let date_string = `${date.getFullYear()} ${date.getMonth()} ${date.getDate()} 
-  at 
-  ${date.getHours()}-${date.getMinutes()}-${date.getSeconds()}`;
+let date_string = `${date.getFullYear()} ${date.getMonth()} ${date.getDate()} at ${date.getHours()}-${date.getMinutes()}-${date.getSeconds()}`;
 let startTime = null;
 
 // Start actions
