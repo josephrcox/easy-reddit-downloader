@@ -5,6 +5,9 @@ const prompt = require('prompt');
 var colors = require('@colors/colors/safe');
 const chalk = require('chalk');
 
+// Read the user_config.json file for user configuration options
+const config = require('./user_config.json');
+
 // Variables used for logging
 let userLogs = '';
 const logFormat = 'txt';
@@ -35,7 +38,8 @@ let downloadDirectory = ''; // Where to download the files to, defined when
 
 // Testing Mode for developer testing. This enables you to hardcode
 // the variables above and skip the prompt.
-const testingMode = false;
+// To edit, go into the user_config.json file. 
+const testingMode = config.testingMode;
 if (testingMode) {
 	subredditList = ['random'];
 	numberOfPosts = 10;
@@ -267,79 +271,101 @@ function continueWithData() {
 							}
 
 							if (postType === 0) {
-								// DOWNLOAD A SELF POST
-								let comments_string = '';
-								request(`${post.url}.json`, (e, resp, b) => {
-									if (e) {
-										onErr(e);
-										log(`Error requesting post with URL: ${post.url}`, false);
-										return;
-									}
-									// With text/self posts, we want to download the top comments as well.
-									// This is done by requesting the post's JSON data, and then iterating through each comment.
-									// We also iterate through the top nested comments (only one level deep).
-									// So we have a file output with the post title, the post text, the author, and the top comments.
-									const data = JSON.parse(b);
-									comments_string += post.title + ' by ' + post.author + '\n\n';
-									comments_string += post.selftext + '\n';
-									comments_string +=
-										'------------------------------------------------\n\n';
-									comments_string += '--COMMENTS--\n\n';
-									for (let i = 0; i < data[1].data.children.length; i++) {
-										const comment = data[1].data.children[i].data;
-										comments_string += comment.author + ':\n';
-										comments_string += comment.body + '\n';
-										if (comment.replies) {
-											const top_reply = comment.replies.data.children[0].data;
-											comments_string += '\t>\t' + top_reply.author + ':\n';
-											comments_string += '\t>\t' + top_reply.body + '\n';
+								if (!config.download_self_posts) {
+									log(
+										`Skipping self post with title: ${post.title}`,
+										false
+									);
+								} else {
+									// DOWNLOAD A SELF POST
+									let comments_string = '';
+									request(`${post.url}.json`, (e, resp, b) => {
+										if (e) {
+											onErr(e);
+											log(`Error requesting post with URL: ${post.url}`, false);
+											return;
 										}
-										comments_string += '\n\n\n';
+										// With text/self posts, we want to download the top comments as well.
+										// This is done by requesting the post's JSON data, and then iterating through each comment.
+										// We also iterate through the top nested comments (only one level deep).
+										// So we have a file output with the post title, the post text, the author, and the top comments.
+										const data = JSON.parse(b);
+										comments_string += post.title + ' by ' + post.author + '\n\n';
+										comments_string += post.selftext + '\n';
+										comments_string +=
+											'------------------------------------------------\n\n';
+										comments_string += '--COMMENTS--\n\n';
+										for (let i = 0; i < data[1].data.children.length; i++) {
+											const comment = data[1].data.children[i].data;
+											comments_string += comment.author + ':\n';
+											comments_string += comment.body + '\n';
+											if (comment.replies) {
+												const top_reply = comment.replies.data.children[0].data;
+												comments_string += '\t>\t' + top_reply.author + ':\n';
+												comments_string += '\t>\t' + top_reply.body + '\n';
+											}
+											comments_string += '\n\n\n';
+										}
+
+										fs.writeFile(
+											`${downloadDirectory}/SELF -${postTitleScrubbed}.txt`,
+											comments_string,
+											function (err) {
+												if (err) throw err;
+												downloadedPosts.self += 1;
+												checkIfDone();
+											}
+										);
+									});
+								}
+								
+							} else if (postType === 1) {
+								if (!config.download_media_posts) {
+									log(
+										`Skipping media post with title: ${post.title}`,
+										false
+									);
+									} else {
+									// DOWNLOAD A MEDIA POST
+									if (imageFormats.indexOf(fileType) !== -1) {
+										request(downloadURL)
+											.pipe(
+												fs.createWriteStream(
+													`${downloadDirectory}/MEDIA - ${postTitleScrubbed}.${fileType}`
+												)
+											)
+											.on('close', () => {
+												downloadedPosts.media += 1;
+												checkIfDone();
+											});
+									} else {
+										downloadedPosts.failed += 1;
+										checkIfDone();
 									}
+								}
+							} else if (postType === 2) {
+								if (!config.download_link_posts) {
+									log(
+										`Skipping link post with title: ${post.title}`,
+										false
+									);
+								} else {
+									// DOWNLOAD A LINK POST
+									// With link posts, we create a simple HTML file that redirects to the post's URL.
+									// This enables the user to still "open" the link file, and it will redirect to the post.
+									// No comments or other data is stored.
+									let htmlFile = `<html><body><script type='text/javascript'>window.location.href = "${post.url}";</script></body></html>`;
 
 									fs.writeFile(
-										`${downloadDirectory}/SELF -${postTitleScrubbed}.txt`,
-										comments_string,
+										`${downloadDirectory}/LINK - ${postTitleScrubbed}.html`,
+										htmlFile,
 										function (err) {
 											if (err) throw err;
-											downloadedPosts.self += 1;
+											downloadedPosts.link += 1;
 											checkIfDone();
 										}
 									);
-								});
-							} else if (postType === 1) {
-								// DOWNLOAD A MEDIA POST
-								if (imageFormats.indexOf(fileType) !== -1) {
-									request(downloadURL)
-										.pipe(
-											fs.createWriteStream(
-												`${downloadDirectory}/MEDIA - ${postTitleScrubbed}.${fileType}`
-											)
-										)
-										.on('close', () => {
-											downloadedPosts.media += 1;
-											checkIfDone();
-										});
-								} else {
-									downloadedPosts.failed += 1;
-									checkIfDone();
 								}
-							} else if (postType === 2) {
-								// DOWNLOAD A LINK POST
-								// With link posts, we create a simple HTML file that redirects to the post's URL.
-								// This enables the user to still "open" the link file, and it will redirect to the post.
-								// No comments or other data is stored.
-								let htmlFile = `<html><body><script type='text/javascript'>window.location.href = "${post.url}";</script></body></html>`;
-
-								fs.writeFile(
-									`${downloadDirectory}/LINK - ${postTitleScrubbed}.html`,
-									htmlFile,
-									function (err) {
-										if (err) throw err;
-										downloadedPosts.link += 1;
-										checkIfDone();
-									}
-								);
 							} else {
 								downloadedPosts.failed += 1;
 								checkIfDone();
@@ -378,6 +404,7 @@ function onErr(err) {
 function checkIfDone() {
 	// Add up all downloaded/failed posts that have been downloaded so far, and check if it matches the
 	// number requested.
+	console.log(JSON.stringify(downloadedPosts));
 	let total =
 		downloadedPosts.self +
 		downloadedPosts.media +
