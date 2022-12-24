@@ -479,5 +479,5 @@ function log(message, visibleToUser) {
 
 // sanitize function for file names so that they work on Mac, Windows, and Linux
 function sanitizeFileName(fileName) {
-	return fileName.replace(/[/\\?%*:|"<>]/g, '-');
+	return fileName.replace(/[/\\?%*:|"<>]/g, '-').substring(0,200);
 }
