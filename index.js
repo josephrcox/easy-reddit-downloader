@@ -245,10 +245,7 @@ function continueWithData() {
 							// Get the file type of the post via the URL. If it ends in .jpg, then it's a jpg.
 							let fileType = downloadURL.split('.').pop();
 							// Post titles can be really long and have invalid characters, so we need to clean them up.
-							let postTitleScrubbed = post.title
-								.replace(/@"^[\w\-. ]+$/, '_')
-								.replace(/\//g, '_')
-								.substring(0, 80);
+							let postTitleScrubbed = sanitizeFileName(post.title);
 
 							// Only run for media posts
 							if (post.preview != undefined && postType === 1) {
@@ -309,7 +306,9 @@ function continueWithData() {
 											`${downloadDirectory}/SELF -${postTitleScrubbed}.txt`,
 											comments_string,
 											function (err) {
-												if (err) throw err;
+												if (err) {
+													log(err);
+												}
 												downloadedPosts.self += 1;
 												checkIfDone();
 											}
@@ -476,4 +475,9 @@ function log(message, visibleToUser) {
 		});
 	}
 
+}
+
+// sanitize function for file names so that they work on Mac, Windows, and Linux
+function sanitizeFileName(fileName) {
+	return fileName.replace(/[/\\?%*:|"<>]/g, '-');
 }
