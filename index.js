@@ -144,7 +144,7 @@ function startPrompt() {
 	}
 }
 
-function continueWithData() {
+function continueWithData(lastPostId) {
 	// Make needed directories for downloads,
 	// clean and nsfw are made nomatter the subreddits downloaded
 	if (!fs.existsSync('./downloads')) {
@@ -165,12 +165,12 @@ function continueWithData() {
 		// as well as a boolean if the log should be displayed to the user.
 		log(
 			`Requesting posts from 
-      https://www.reddit.com/r/${subreddit}/${sorting}.json?sort=${sorting}&t=${time}&limit=${numberOfPosts}`,
+      https://www.reddit.com/r/${subreddit}/${sorting}.json?sort=${sorting}&t=${time}&limit=${numberOfPosts}&after=${lastPostId}`,
 			true
 		);
 		// Get the top posts from the subreddit
 		request(
-			`https://www.reddit.com/r/${subreddit}/${sorting}.json?sort=${sorting}&t=${time}&limit=${numberOfPosts}`,
+			`https://www.reddit.com/r/${subreddit}/${sorting}.json?sort=${sorting}&t=${time}&limit=${numberOfPosts}&after=${lastPostId}`,
 			(error, response, body) => {
 				const data = JSON.parse(body);
 
@@ -310,7 +310,7 @@ function continueWithData() {
 													log(err);
 												}
 												downloadedPosts.self += 1;
-												checkIfDone();
+												checkIfDone(post.name);
 											}
 										);
 									});
@@ -333,11 +333,11 @@ function continueWithData() {
 											)
 											.on('close', () => {
 												downloadedPosts.media += 1;
-												checkIfDone();
+												checkIfDone(post.name);
 											});
 									} else {
 										downloadedPosts.failed += 1;
-										checkIfDone();
+										checkIfDone(post.name);
 									}
 								}
 							} else if (postType === 2) {
@@ -359,13 +359,14 @@ function continueWithData() {
 										function (err) {
 											if (err) throw err;
 											downloadedPosts.link += 1;
-											checkIfDone();
+											checkIfDone(post.name);
 										}
 									);
 								}
 							} else {
+								log("Failed to download: " + post.title + "with URL: " + post.url)
 								downloadedPosts.failed += 1;
-								checkIfDone();
+								checkIfDone(post.name);
 							}
 						} else {
 							log(
@@ -398,7 +399,7 @@ function onErr(err) {
 // We could check this inline but it's easier to read if it's a separate function,
 // and this ensures that we only check after the files are done being downloaded to the PC, not
 // just when the request is sent.
-function checkIfDone() {
+function checkIfDone(lastPostId) {
 	// Add up all downloaded/failed posts that have been downloaded so far, and check if it matches the
 	// number requested.
 	console.log(JSON.stringify(downloadedPosts));
@@ -446,6 +447,11 @@ function checkIfDone() {
 		log(`Still downloading posts... (${total}/${numberOfPosts})`, true);
 		log(JSON.stringify(downloadedPosts), true);
 		log('\n------------------------------------------------', true);
+
+		// check if total is divisible by 100
+		if (total % 100 == 0) {
+			continueWithData(lastPostId);
+		}
 	}
 }
 
