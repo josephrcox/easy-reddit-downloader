@@ -452,10 +452,13 @@ function checkIfDone() {
 	}
 }
 
-// Create initial log file with current date and time.
-fs.writeFile(`./logs/${date_string}.${logFormat}`, userLogs, function (err) {
-	if (err) throw err;
-});
+if (config.local_logs) {
+	// Create initial log file with current date and time.
+	fs.writeFile(`./logs/${date_string}.${logFormat}`, userLogs, function (err) {
+		if (err) throw err;
+	});
+}
+
 
 function log(message, visibleToUser) {
 	// This function takes a message string and a boolean.
@@ -465,11 +468,14 @@ function log(message, visibleToUser) {
 	if (visibleToUser || visibleToUser == undefined) {
 		console.log(message);
 	}
-	if (!fs.existsSync('./logs')) {
-		fs.mkdirSync('./logs');
+	if (config.local_logs) {
+		if (!fs.existsSync('./logs')) {
+			fs.mkdirSync('./logs');
+		}
+	
+		fs.writeFile(`./logs/${date_string}.${logFormat}`, userLogs, function (err) {
+			if (err) throw err;
+		});
 	}
 
-	fs.writeFile(`./logs/${date_string}.${logFormat}`, userLogs, function (err) {
-		if (err) throw err;
-	});
 }
