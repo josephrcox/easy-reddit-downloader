@@ -74,40 +74,42 @@ For example, if there was a post that went to `https://www.google.com/` then the
 ```
 
 ## FAQ
-#### Is there any authentication needed?
+### Is there any authentication needed?
 No. This uses the public Reddit API provided by adding `.json` to regular Reddit pages. 
 This means no oauth is required and it's easy for anyone with an internet connection to use. 
 
-#### What post types are supported and should download?
+### What post types are supported and should download?
 - Any text/self post
 - Any image (posted directly on reddit, imgur, or other services)
 - Most video or image-video formats (tested with MP4, GIF, GIFV which converts to MP4, MOV)
 - Any link post (which generates an HTML file that redirects the user to the link page)
 
-#### Do I need to enter the "/r/" or "r/" before a subreddit name?
+### Do I need to enter the "/r/" or "r/" before a subreddit name?
 No.
 
-#### Why am I asked how many posts to dig through? What does this number mean?
+### Why am I asked how many posts to dig through? What does this number mean?
 The higher the number the....
 - More posts you will download
 - More data you will use (keep in mind if on a data-limited plan)
 - Less subreddits you will download/second
 
+*Just because you put 1000, you may not get 1000 posts. There are lots of reasons why this can happen, and it should not be treated as a bug. The average "success rate" right now is about 70%. So if you request 1000 posts, you will likely get 700.*
+
 Keep in mind that the number you enter is per subreddit. So if you enter `askreddit,news` and `15` for the post-count number, then it will download 15 posts from /r/askreddit and 15 posts from /r/news. 
 
-#### Is there any tracking with what I download?
+### Is there any tracking with what I download?
 No. There is no Google analytics or other tracking that goes into the posts or subreddits that you choose to download. 
 
-#### Can this get me banned or restricted from Reddit?
+### Can this get me banned or restricted from Reddit?
 Not sure. I have downloaded a lot and haven't faced problems, but it doesn't mean that Reddit won't ban my IP address in the future with continuous use. 
 
-#### Can I run this without NodeJS installed?
+### Can I run this without NodeJS installed?
 No.
 
-#### Can I run this on my computer?
+### Can I run this on my computer?
 Any computer that can run NodeJS can run this, although a stable internet connection and room for the posts to download will decrease the chance of random errors. If you face problems, submit an issue!
 
-#### Why did you (mapleweekend) make this?
+### Why did you (mapleweekend) make this?
 In the past, I have wanted to download subreddits for offline consumption. This makes it easy to do so and does not need OAUTH which I found annoying with many other tools. I also just wanted a fun tiny project to work on during vacation so I spent a couple of hours making and refining this. 
 
 ## Upcoming features
