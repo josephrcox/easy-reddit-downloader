@@ -27,20 +27,6 @@ let time = 'all'; // What time period to sort by (hour, day, week, month, year, 
 let repeatForever = false; // If true, the program will repeat every timeBetweenRuns milliseconds
 let downloadDirectory = ''; // Where to download the files to, defined when
 
-// Testing Mode for developer testing. This enables you to hardcode
-// the variables above and skip the prompt.
-// To edit, go into the user_config.json file.
-const testingMode = config.testingMode;
-if (testingMode) {
-	subredditList = config.testingModeOptions.subredditList;
-	numberOfPosts = config.testingModeOptions.numberOfPosts;
-	sorting = config.testingModeOptions.sorting;
-	time = config.testingModeOptions.time;
-	repeatForever = config.testingModeOptions.repeatForever;
-	timeBetweenRuns = config.testingModeOptions.timeBetweenRuns;
-	downloadSubredditPosts(subredditList[0], ''); // skip the prompt and get right to the API calls
-}
-
 // Default object to track the downloaded posts by type,
 // and the subreddit downloading from.
 let downloadedPosts = {
@@ -62,6 +48,20 @@ const repeatIntervals = {
 	7: 1000 * 60 * 60 * 3, // 3 hours
 	8: 1000 * 60 * 60 * 24, // 24 hours
 };
+
+// Testing Mode for developer testing. This enables you to hardcode
+// the variables above and skip the prompt.
+// To edit, go into the user_config.json file.
+const testingMode = config.testingMode;
+if (testingMode) {
+	subredditList = config.testingModeOptions.subredditList;
+	numberOfPosts = config.testingModeOptions.numberOfPosts;
+	sorting = config.testingModeOptions.sorting;
+	time = config.testingModeOptions.time;
+	repeatForever = config.testingModeOptions.repeatForever;
+	timeBetweenRuns = config.testingModeOptions.timeBetweenRuns;
+	downloadSubredditPosts(subredditList[0], ''); // skip the prompt and get right to the API calls
+}
 
 // Start actions
 console.clear(); // Clear the console
@@ -158,23 +158,24 @@ function makeDirectories() {
 	if (!fs.existsSync('./downloads')) {
 		fs.mkdirSync('./downloads');
 	}
-	if (!fs.existsSync('./downloads/clean')) {
-		fs.mkdirSync('./downloads/clean');
-	}
-	if (!fs.existsSync('./downloads/nsfw')) {
-		fs.mkdirSync('./downloads/nsfw');
+	if (config.separate_clean_nsfw) {
+		if (!fs.existsSync('./downloads/clean')) {
+			fs.mkdirSync('./downloads/clean');
+		}
+		if (!fs.existsSync('./downloads/nsfw')) {
+			fs.mkdirSync('./downloads/nsfw');
+		}
 	}
 }
 
 async function downloadSubredditPosts(subreddit, lastPostId) {
-	let total =
-		downloadedPosts.self + downloadedPosts.media + downloadedPosts.link;
-	let postsRemaining = numberOfPosts - total;
+	let postsRemaining = numberOfPostsRemaining()[0];
 	if (postsRemaining <= 0) {
 		// If we have downloaded enough posts, move on to the next subreddit
 		if (subredditList.length > 1) {
+			subreddit_the_user_is_downloading_from += 1;
 			return downloadSubredditPosts(
-				subredditList[subreddit_the_user_is_downloading_from + 1],
+				subredditList[subreddit_the_user_is_downloading_from],
 				''
 			);
 		} else {
@@ -187,7 +188,7 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 		postsRemaining = 100;
 	}
 
-	// if lastPostId is undefined, set it to an empty string. Common on first run. 
+	// if lastPostId is undefined, set it to an empty string. Common on first run.
 	if (lastPostId == undefined) {
 		lastPostId = '';
 	}
@@ -195,7 +196,6 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 
 	try {
 		startTime = new Date();
-		subreddit = subreddit.replace(/\s/g, '');
 
 		// Use log function to log a string
 		// as well as a boolean if the log should be displayed to the user.
@@ -213,19 +213,20 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 				`https://www.reddit.com/r/${subreddit}/${sorting}/.json?sort=${sorting}&t=${time}&limit=${postsRemaining}&after=${lastPostId}`
 			);
 			data = await response.data;
-			if (
-				data.message == 'Not Found' ||
-				data.data.children.length == 0
-			) {	
+			if (data.message == 'Not Found' || data.data.children.length == 0) {
 				throw error;
 			}
-		} catch(err) {
+		} catch (err) {
 			log(
 				`\n\nERROR: There was a problem fetching posts for ${subreddit}. This is likely because the subreddit is private, banned, or doesn't exist.`
 			);
 			if (subredditList.length > 1) {
+				if (subreddit_the_user_is_downloading_from > subredditList.length - 1) {
+					subreddit_the_user_is_downloading_from = -1;
+				}
+				subreddit_the_user_is_downloading_from += 1;
 				return downloadSubredditPosts(
-					subredditList[subreddit_the_user_is_downloading_from + 1],
+					subredditList[subreddit_the_user_is_downloading_from],
 					''
 				);
 			} else {
@@ -233,16 +234,16 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 			}
 		}
 
-		
 		// if the first post on the subreddit is NSFW, then there is a fair chance
 		// that the rest of the posts are NSFW.
 		let isOver18 = data.data.children[0].data.over_18 ? 'nsfw' : 'clean';
 		downloadedPosts.subreddit = data.data.children[0].data.subreddit;
 
-		downloadDirectory = `./downloads/${isOver18}/${data.data.children[0].data.subreddit}`;
 		if (!config.separate_clean_nsfw) {
 			downloadDirectory = `./downloads/${data.data.children[0].data.subreddit}`;
-		} 
+		} else {
+			downloadDirectory = `./downloads/${isOver18}/${data.data.children[0].data.subreddit}`;
+		}
 
 		// Make sure the image directory exists
 		// If no directory is found, create one
@@ -482,15 +483,16 @@ function onErr(err) {
 function checkIfDone(lastPostId) {
 	// Add up all downloaded/failed posts that have been downloaded so far, and check if it matches the
 	// number requested.
-	let total =
-		downloadedPosts.self + downloadedPosts.media + downloadedPosts.link + downloadedPosts.failed;
-	if (total >= numberOfPosts) {
+
+	if (numberOfPostsRemaining()[0] === 0) {
 		// All done downloading posts from this subreddit
 		let endTime = new Date();
 		let timeDiff = endTime - startTime;
 		timeDiff /= 1000;
 		// simplify to first 5 digits for msPerPost
-		let msPerPost = (timeDiff / total).toString().substring(0, 5);
+		let msPerPost = (timeDiff / numberOfPostsRemaining()[1])
+			.toString()
+			.substring(0, 5);
 
 		log(
 			'🎉 All done downloading posts from ' + downloadedPosts.subreddit + '!',
@@ -529,19 +531,33 @@ function checkIfDone(lastPostId) {
 		}
 		return true;
 	} else {
-		log(`Still downloading posts... (${total}/${numberOfPosts})`, true);
+		log(
+			`Still downloading posts... (${
+				numberOfPostsRemaining()[1]
+			}/${numberOfPosts})`,
+			true
+		);
 		log(JSON.stringify(downloadedPosts), true);
 		log('\n------------------------------------------------', true);
 
 		// check if total is divisible by 100
-		if (total % 100 == 0) {
-			downloadSubredditPosts(
+		if (numberOfPostsRemaining()[1] % 100 == 0) {
+			return downloadSubredditPosts(
 				subredditList[subreddit_the_user_is_downloading_from],
 				lastPostId
 			);
 		}
 		return false;
 	}
+}
+
+function numberOfPostsRemaining() {
+	let total =
+		downloadedPosts.self +
+		downloadedPosts.media +
+		downloadedPosts.link +
+		downloadedPosts.failed;
+	return [numberOfPosts - total, total];
 }
 
 function log(message, visibleToUser) {
@@ -557,7 +573,7 @@ function log(message, visibleToUser) {
 			fs.mkdirSync('./logs');
 		}
 
-		let logFileName = "";
+		let logFileName = '';
 		if (config.local_logs_naming_scheme.showDateAndTime) {
 			logFileName += `${date_string} - `;
 		}
@@ -572,7 +588,7 @@ function log(message, visibleToUser) {
 			logFileName += `${numberOfPosts} - `;
 		}
 
-		if (logFileName.endsWith(" - ")) {
+		if (logFileName.endsWith(' - ')) {
 			logFileName = logFileName.substring(0, logFileName.length - 3);
 		}
 
