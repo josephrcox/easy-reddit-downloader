@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 // const AutoGitUpdate = require('auto-git-update');
 
 // const config = {
@@ -13,6 +14,8 @@
 
 // updater.autoUpdate();
 
+=======
+>>>>>>> Stashed changes
 // NodeJS Dependencies
 const request = require('request');
 const fs = require('fs');
@@ -108,7 +111,7 @@ function startPrompt() {
 					subreddit: {
 						description: colors.magenta(
 							'What subreddit would you like to download?' +
-								'You may submit multiple separated by commas (no spaces).\n\t'
+								' You may submit multiple separated by commas (no spaces).\n\t'
 						),
 					},
 					post_count: {
@@ -343,12 +346,12 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 									comments_string += comment.author + ':\n';
 									comments_string += comment.body + '\n';
 									if (comment.replies) {
-									  const top_reply = comment.replies.data.children[0].data;
-									  comments_string += '\t>\t' + top_reply.author + ':\n';
-									  comments_string += '\t>\t' + top_reply.body + '\n';
+										const top_reply = comment.replies.data.children[0].data;
+										comments_string += '\t>\t' + top_reply.author + ':\n';
+										comments_string += '\t>\t' + top_reply.body + '\n';
 									}
 									comments_string += '\n\n\n';
-								  });
+								});
 							}
 
 							fs.writeFile(
