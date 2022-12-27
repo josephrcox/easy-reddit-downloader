@@ -1,6 +1,6 @@
 const AutoGitUpdate = require('auto-git-update');
 
-const config = {
+const updateConfig = {
     repository: 'https://github.com/mapleweekend/easy-reddit-downloader',
     fromReleases: false,
     tempLocation: './temp/',
@@ -9,7 +9,7 @@ const config = {
     exitOnComplete: true
 }
 
-const updater = new AutoGitUpdate(config);
+const updater = new AutoGitUpdate(updateConfig);
 
 updater.autoUpdate();
 
