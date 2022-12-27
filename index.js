@@ -187,6 +187,7 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 		postsRemaining = 100;
 	}
 
+	// if lastPostId is undefined, set it to an empty string. Common on first run. 
 	if (lastPostId == undefined) {
 		lastPostId = '';
 	}
@@ -238,8 +239,11 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 		let isOver18 = data.data.children[0].data.over_18 ? 'nsfw' : 'clean';
 		downloadedPosts.subreddit = data.data.children[0].data.subreddit;
 
-		// Iterate through the posts, saving the post being iterated on as "post".
 		downloadDirectory = `./downloads/${isOver18}/${data.data.children[0].data.subreddit}`;
+		if (!config.separate_clean_nsfw) {
+			downloadDirectory = `./downloads/${data.data.children[0].data.subreddit}`;
+		} 
+
 		// Make sure the image directory exists
 		// If no directory is found, create one
 		if (!fs.existsSync(downloadDirectory)) {
@@ -367,7 +371,7 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 							log(`Skipping media post with title: ${post.title}`, false);
 						} else {
 							if (imageFormats.indexOf(fileType) !== -1) {
-								downloadFile(
+								downloadMediaFile(
 									downloadURL,
 									`${downloadDirectory}/MEDIA - ${postTitleScrubbed}.${fileType}`,
 									post.name
@@ -424,7 +428,7 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 	}
 }
 
-async function downloadFile(downloadURL, filePath, postName) {
+async function downloadMediaFile(downloadURL, filePath, postName) {
 	try {
 		const response = await axios({
 			method: 'GET',
