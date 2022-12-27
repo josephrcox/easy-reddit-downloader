@@ -1,5 +1,5 @@
 # Easy Reddit Post Downloader
-*A NodeJS-based Reddit post downloader utilizing only the public Reddit API, no OAuth or login required!*
+*A NodeJS-based Reddit post downloader utilizing only the public Reddit API, **no OAuth or login required!***
 
 <img width="965" alt="Screenshot 2022-12-22 at 2 51 23 PM" src="https://user-images.githubusercontent.com/73198556/209214987-50813257-5c9a-432a-b882-7f60429fa63a.png">
 
