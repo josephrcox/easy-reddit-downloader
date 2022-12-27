@@ -9,6 +9,11 @@
         "timeBetweenRuns": 30000
     },
     "local_logs": true,
+    "local_logs_naming_scheme": {
+        "showDateAndTime": true,
+        "showSubreddits": true,
+        "showNumberOfPosts": false
+    },
     "download_self_posts": true,
     "download_media_posts": true,
     "download_link_posts": true,
