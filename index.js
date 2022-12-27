@@ -18,19 +18,6 @@ let startTime = null;
 
 let subreddit_the_user_is_downloading_from = 0; // Used to track which subreddit the user is downloading from
 
-// Start actions
-console.clear(); // Clear the console
-log(chalk.cyan('Welcome to Reddit Post Downloader! ('), true);
-log(
-	chalk.red(
-		'Contribute @ https://github.com/mapleweekend/easy-reddit-downloader'
-	),
-	true
-);
-// For debugging logs
-log("User conffiguration: " + JSON.stringify(config), false);
-log("Testing mode options: " + JSON.stringify(config.testingMode), false);
-
 // User-defined variables, these can be preset with the help of testingMode
 let timeBetweenRuns = 0; // in milliseconds, the time between runs. This is only used if repeatForever is true
 let subredditList = []; // List of subreddits in this format: ['subreddit1', 'subreddit2', 'subreddit3']
@@ -75,6 +62,21 @@ const repeatIntervals = {
 	7: 1000 * 60 * 60 * 3, // 3 hours
 	8: 1000 * 60 * 60 * 24, // 24 hours
 };
+
+// Start actions
+console.clear(); // Clear the console
+log(chalk.cyan('Welcome to Reddit Post Downloader! ('), true);
+log(
+	chalk.red(
+		'Contribute @ https://github.com/mapleweekend/easy-reddit-downloader'
+	),
+	true
+);
+// For debugging logs
+log("User config: " + JSON.stringify(config), false);
+if (config.testingMode) {
+	log("Testing mode options: " + JSON.stringify(config.testingMode), false);
+}
 
 function startPrompt() {
 	prompt.start();
@@ -169,6 +171,7 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 		lastPostId = '';
 	}
 	makeDirectories();
+
 	try {
 		startTime = new Date();
 		subreddit = subreddit.replace(/\s/g, '');
@@ -465,7 +468,11 @@ function checkIfDone(lastPostId) {
 			}, timeBetweenRuns);
 		} else {
 			startPrompt();
+			
 		}
+
+		
+
 	} else {
 		log(`Still downloading posts... (${total}/${numberOfPosts})`, true);
 		log(JSON.stringify(downloadedPosts), true);
@@ -481,12 +488,12 @@ function checkIfDone(lastPostId) {
 	}
 }
 
-if (config.local_logs) {
-	// Create initial log file with current date and time.
-	fs.writeFile(`./logs/${date_string}.${logFormat}`, userLogs, function (err) {
-		if (err) throw err;
-	});
-}
+// if (config.local_logs) {
+// 	// Create initial log file with current date and time.
+// 	fs.writeFile(`./logs/${date_string}.${logFormat}`, userLogs, function (err) {
+// 		if (err) throw err;
+// 	});
+// }
 
 function log(message, visibleToUser) {
 	// This function takes a message string and a boolean.
@@ -496,13 +503,16 @@ function log(message, visibleToUser) {
 	if (visibleToUser || visibleToUser == undefined) {
 		console.log(message);
 	}
-	if (config.local_logs) {
+	if (config.local_logs && subredditList.length > 0) {
 		if (!fs.existsSync('./logs')) {
 			fs.mkdirSync('./logs');
 		}
 
+		let subredditListString = JSON.stringify(subredditList).replace(/[^a-zA-Z0-9,]/g, '');
+		// remove all characters besides commas, letters, and numbers
+
 		fs.writeFile(
-			`./logs/${date_string}.${logFormat}`,
+			`./logs/${date_string} - ${subredditListString}.${logFormat}`,
 			userLogs,
 			function (err) {
 				if (err) throw err;

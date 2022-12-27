@@ -1,5 +1,5 @@
 {
-    "testingMode": true,
+    "testingMode": false,
     "testingModeOptions": {
         "subredditList": ["AskReddit"],
         "numberOfPosts": 50,
