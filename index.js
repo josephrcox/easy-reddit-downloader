@@ -204,35 +204,35 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 			true
 		);
 		// Get the top posts from the subreddit
+		let response = null;
+		let data = null;
 
-		const response = await axios.get(
-			`https://www.reddit.com/r/${subreddit}/${sorting}/.json?sort=${sorting}&t=${time}&limit=${postsRemaining}&after=${lastPostId}`
-		);
-		const data = response.data;
-		const error = response.error;
-
-		// check if there was a problem with the request.
-		// typical if there are no posts for the subreddit, or if the subreddit is private, banned, etc.
-		if (
-			error ||
-			data.message == 'Not Found' ||
-			data.data.children.length == 0
-		) {
-			log(
-				`\n\nERROR: There was a problem fetching posts for ${subreddit}. \n
-				-- Please check if you typed it correctly. (Note: This tool does not support private or banned subreddits)\n\n`,
-				true
+		try {
+			response = await axios.get(
+				`https://www.reddit.com/r/${subreddit}/${sorting}/.json?sort=${sorting}&t=${time}&limit=${postsRemaining}&after=${lastPostId}`
 			);
-			if (subreddit_the_user_is_downloading_from == subredditList.length - 1) {
-				// if the last subreddit in the list is invalid, then the program is done.
-				return startPrompt();
-			} else {
+			data = await response.data;
+			if (
+				data.message == 'Not Found' ||
+				data.data.children.length == 0
+			) {	
+				throw error;
+			}
+		} catch(err) {
+			log(
+				`\n\nERROR: There was a problem fetching posts for ${subreddit}. This is likely because the subreddit is private, banned, or doesn't exist.`
+			);
+			if (subredditList.length > 1) {
 				return downloadSubredditPosts(
-					subredditList[++subreddit_the_user_is_downloading_from],
+					subredditList[subreddit_the_user_is_downloading_from + 1],
 					''
 				);
+			} else {
+				return checkIfDone();
 			}
 		}
+
+		
 		// if the first post on the subreddit is NSFW, then there is a fair chance
 		// that the rest of the posts are NSFW.
 		let isOver18 = data.data.children[0].data.over_18 ? 'nsfw' : 'clean';
