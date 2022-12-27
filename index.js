@@ -91,9 +91,14 @@ request.get('https://api.github.com/repos/mapleweekend/easy-reddit-downloader/re
 
     // Compare the current version to the latest release version
     if (version !== latestVersion) {
-      log(`A new version (${latestVersion}) is available. Please update to the latest version with 'git pull'.\n`, true);
+      log(`ALERT: A new version (${latestVersion}) is available. \nPlease update to the latest version with 'git pull'.\n`, true);
     } else {
 		log("You are on the latest stable version (" + version + ")\n", true);
+	}
+	// Only ask the prompt questions if testingMode is disabled.
+	// If testingMode is enabled, the script will run with the preset values written at the top.
+	if (!testingMode) {
+		startPrompt();
 	}
   }
 });
@@ -135,9 +140,9 @@ function startPrompt() {
 					},
 					repeat: {
 						description: colors.red(
-							'How often should this be run? \n' +
+							'How often should this be run? \nManually enter number other than the options below for manual entry, i.e. "500" for every 0.5 second \n' +
 								'1.) one time\n' +
-								'2.) every 30 seconds\n' +
+								'2.) every 0.5 minute\n' +
 								'3.) every minute\n' +
 								'4.) every 5 minutes\n' +
 								'5.) every 30 minutes\n' +
@@ -164,7 +169,14 @@ function startPrompt() {
 				if (result.repeat == 1) {
 					repeatForever = false;
 				}
-				timeBetweenRuns = repeatIntervals[result.repeat] || 0;
+				if (result.repeat < 1 || result.repeat > 8) {
+					if (result.repeat < 0) {
+						result.repeat = 0;
+					}
+					timeBetweenRuns = result.repeat;
+				} else {
+					timeBetweenRuns = repeatIntervals[result.repeat] || 0;
+				}
 
 				// With the data gathered, call the APIs and download the posts
 				downloadSubredditPosts(subredditList[0], '');
@@ -483,13 +495,6 @@ async function downloadMediaFile(downloadURL, filePath, postName) {
 			log('ERROR: ' + error, false);
 		}
 	}
-}
-
-// Only ask the prompt questions if testingMode is disabled.
-// If testingMode is enabled, the script will run with the preset values written at the top.
-if (!testingMode) {
-	console.log("Checking for latest version...")
-	setTimeout(startPrompt, 2000);
 }
 
 function onErr(err) {
