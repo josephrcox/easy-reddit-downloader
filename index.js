@@ -1,23 +1,7 @@
-<<<<<<< Updated upstream
-// const AutoGitUpdate = require('auto-git-update');
-
-// const config = {
-//     repository: 'https://github.com/mapleweekend/easy-reddit-downloader',
-//     fromReleases: false,
-//     tempLocation: './temp/',
-//     ignoreFiles: ['./user_config.js', './logs/', './downloads/'],
-//     executeOnComplete: 'node index.js',
-//     exitOnComplete: true
-// }
-
-// const updater = new AutoGitUpdate(config);
-
-// updater.autoUpdate();
-
-=======
->>>>>>> Stashed changes
-// NodeJS Dependencies
 const request = require('request');
+const { version } = require('./package.json');
+
+// NodeJS Dependencies
 const fs = require('fs');
 const prompt = require('prompt');
 var colors = require('@colors/colors/safe');
@@ -95,6 +79,25 @@ log('User config: ' + JSON.stringify(config), false);
 if (config.testingMode) {
 	log('Testing mode options: ' + JSON.stringify(config.testingMode), false);
 }
+
+// Make a GET request to the GitHub API to get the latest release
+request.get('https://api.github.com/repos/mapleweekend/easy-reddit-downloader/releases/latest', { headers: { 'User-Agent': 'Downloader'}}, (error, response, body) => {
+  if (error) {
+    console.error(error);
+  } else {
+    // Parse the response body to get the version number of the latest release
+    const latestRelease = JSON.parse(body);
+    const latestVersion = latestRelease.tag_name;
+
+    // Compare the current version to the latest release version
+    if (version !== latestVersion) {
+      log(`A new version (${latestVersion}) is available. Please update to the latest version.\n`, true);
+    } else {
+		log("You are on the latest stable version (" + version + ")\n", true);
+	}
+  }
+});
+
 
 function startPrompt() {
 	prompt.start();
@@ -485,7 +488,8 @@ async function downloadMediaFile(downloadURL, filePath, postName) {
 // Only ask the prompt questions if testingMode is disabled.
 // If testingMode is enabled, the script will run with the preset values written at the top.
 if (!testingMode) {
-	startPrompt();
+	console.log("Checking for latest version...")
+	setTimeout(startPrompt, 2000);
 }
 
 function onErr(err) {
