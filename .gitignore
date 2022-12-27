@@ -131,3 +131,6 @@ downloads
 
 # testing
 testing_folder
+
+# config
+user_config.json

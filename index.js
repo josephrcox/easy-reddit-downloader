@@ -8,6 +8,16 @@ var colors = require('@colors/colors/safe');
 const chalk = require('chalk');
 const axios = require('axios');
 
+// check if user_config.json exists
+if (!fs.existsSync('./user_config.json')) {
+	// create ./user_config.json if it doesn't exist, by duplicating user_config_DEFAULT.json and renaming it
+	fs.copyFile('./user_config_DEFAULT.json', './user_config.json', (err) => {
+		if (err) throw err;
+		log('user_config.json was created. Edit it to manage user options.', true);
+	});
+}
+
+
 // Read the user_config.json file for user configuration options
 const config = require('./user_config.json');
 
@@ -67,7 +77,7 @@ if (testingMode) {
 
 // Start actions
 console.clear(); // Clear the console
-log(chalk.cyan('Welcome to Reddit Post Downloader! ('), true);
+log(chalk.cyan('Welcome to Reddit Post Downloader! '), true);
 log(
 	chalk.red(
 		'Contribute @ https://github.com/mapleweekend/easy-reddit-downloader'
@@ -228,6 +238,20 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 	makeDirectories();
 
 	try {
+		if (subreddit == undefined) {
+			if (subredditList.length > 1) {
+				if (subreddit_the_user_is_downloading_from > subredditList.length - 1) {
+					subreddit_the_user_is_downloading_from = -1;
+				}
+				subreddit_the_user_is_downloading_from += 1;
+				return downloadSubredditPosts(
+					subredditList[subreddit_the_user_is_downloading_from],
+					''
+				);
+			} else {
+				return checkIfDone();
+			}
+		}
 		startTime = new Date();
 
 		// Use log function to log a string
