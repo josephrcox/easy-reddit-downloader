@@ -91,7 +91,7 @@ request.get('https://api.github.com/repos/mapleweekend/easy-reddit-downloader/re
 
     // Compare the current version to the latest release version
     if (version !== latestVersion) {
-      log(`A new version (${latestVersion}) is available. Please update to the latest version.\n`, true);
+      log(`A new version (${latestVersion}) is available. Please update to the latest version with 'git pull'.\n`, true);
     } else {
 		log("You are on the latest stable version (" + version + ")\n", true);
 	}
