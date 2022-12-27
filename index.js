@@ -1,4 +1,19 @@
-// NodeJS Dependencies: request, fs, prompt, colors, chalk
+const AutoGitUpdate = require('auto-git-update');
+
+const config = {
+    repository: 'https://github.com/mapleweekend/easy-reddit-downloader',
+    fromReleases: false,
+    tempLocation: './temp/',
+    ignoreFiles: ['./user_config.js', './logs/', './downloads/'],
+    executeOnComplete: 'node index.js',
+    exitOnComplete: true
+}
+
+const updater = new AutoGitUpdate(config);
+
+updater.autoUpdate();
+
+// NodeJS Dependencies
 const request = require('request');
 const fs = require('fs');
 const prompt = require('prompt');
