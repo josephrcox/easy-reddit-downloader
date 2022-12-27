@@ -323,17 +323,17 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 							if (config.download_comments) {
 								// If the user wants to download comments
 								comments_string += '--COMMENTS--\n\n';
-								for (let i = 0; i < data[1].data.children.length; i++) {
-									const comment = data[1].data.children[i].data;
+								data[1].data.children.forEach((child) => {
+									const comment = child.data;
 									comments_string += comment.author + ':\n';
 									comments_string += comment.body + '\n';
 									if (comment.replies) {
-										const top_reply = comment.replies.data.children[0].data;
-										comments_string += '\t>\t' + top_reply.author + ':\n';
-										comments_string += '\t>\t' + top_reply.body + '\n';
+									  const top_reply = comment.replies.data.children[0].data;
+									  comments_string += '\t>\t' + top_reply.author + ':\n';
+									  comments_string += '\t>\t' + top_reply.body + '\n';
 									}
 									comments_string += '\n\n\n';
-								}
+								  });
 							}
 
 							fs.writeFile(
