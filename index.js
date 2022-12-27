@@ -1,17 +1,17 @@
-const AutoGitUpdate = require('auto-git-update');
+// const AutoGitUpdate = require('auto-git-update');
 
-const config = {
-    repository: 'https://github.com/mapleweekend/easy-reddit-downloader',
-    fromReleases: false,
-    tempLocation: './temp/',
-    ignoreFiles: ['./user_config.js', './logs/', './downloads/'],
-    executeOnComplete: 'node index.js',
-    exitOnComplete: true
-}
+// const config = {
+//     repository: 'https://github.com/mapleweekend/easy-reddit-downloader',
+//     fromReleases: false,
+//     tempLocation: './temp/',
+//     ignoreFiles: ['./user_config.js', './logs/', './downloads/'],
+//     executeOnComplete: 'node index.js',
+//     exitOnComplete: true
+// }
 
-const updater = new AutoGitUpdate(config);
+// const updater = new AutoGitUpdate(config);
 
-updater.autoUpdate();
+// updater.autoUpdate();
 
 // NodeJS Dependencies
 const request = require('request');
