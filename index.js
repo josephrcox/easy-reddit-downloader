@@ -327,8 +327,8 @@ function getPostType(post, postTypeOptions) {
 		postType = 0;
 	} else if (
 		post.post_hint === 'image' ||
+		((post.post_hint === 'rich:video') && !post.domain.includes("youtu")) ||
 		post.post_hint === 'hosted:video' ||
-		post.post_hint === 'rich:video' ||
 		(post.post_hint === 'link' && post.domain.includes('imgur')) ||
 		post.domain.includes('i.redd.it')
 	) {
@@ -462,30 +462,33 @@ async function downloadPost(post) {
 				// Reddit stores fallback URL previews for some GIFs.
 				// Changing the URL to download to the fallback URL will download the GIF, in MP4 format.
 				if (post.preview.reddit_video_preview != undefined) {
+					log("Using fallback URL for Reddit's GIF preview." + post.preview.reddit_video_preview)
 					downloadURL = post.preview.reddit_video_preview.fallback_url;
 					fileType = 'mp4';
 				} else if (post.url_overridden_by_dest.includes('.gifv')) {
 					// Luckily, you can just swap URLs on imgur with .gifv
 					// with ".mp4" to get the MP4 version. Amazing!
+					log("Replacing gifv with mp4")
 					downloadURL = post.url_overridden_by_dest.replace('.gifv', '.mp4');
 					fileType = 'mp4';
 				}
+			} 
+			if (post.media != undefined && post.post_hint == "hosted:video") { 
+				// If the post has a media object, then it's a video.
+				// We need to get the URL from the media object.
+				// This is because the URL in the post object is a fallback URL.
+				// The media object has the actual URL.
+				downloadURL = post.media.reddit_video.fallback_url;
+				fileType = 'mp4';
 			}
 			if (!config.download_media_posts) {
 				log(`Skipping media post with title: ${post.title}`, false);
 			} else {
-				if (imageFormats.indexOf(fileType) !== -1) {
-					downloadMediaFile(
-						downloadURL,
-						`${downloadDirectory}/MEDIA - ${postTitleScrubbed}.${fileType}`,
-						post.name
-					);
-				} else {
-					downloadedPosts.failed += 1;
-					if (checkIfDone(post.name)) {
-						return;
-					}
-				}
+				downloadMediaFile(
+					downloadURL,
+					`${downloadDirectory}/MEDIA - ${postTitleScrubbed}.${fileType}`,
+					post.name
+				);
 			}
 		} else if (postType === 2) {
 			if (!config.download_link_posts) {
