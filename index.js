@@ -325,6 +325,7 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 				} else if (
 					post.post_hint === 'image' ||
 					post.post_hint === 'hosted:video'
+					|| (post.post_hint === 'rich:video') || (post.post_hint === 'link' && post.domain.includes('imgur'))
 				) {
 					postType = 1;
 				} else {
