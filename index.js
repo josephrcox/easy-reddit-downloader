@@ -572,6 +572,7 @@ function checkIfDone(lastPostId) {
 				subredditList[subreddit_the_user_is_downloading_from]
 			);
 		} else if (repeatForever) {
+			subreddit_the_user_is_downloading_from = 0;
 			log(
 				`⏲️ Waiting ${timeBetweenRuns / 1000} seconds before rerunning...`,
 				true
