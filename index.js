@@ -8,18 +8,20 @@ var colors = require('@colors/colors/safe');
 const chalk = require('chalk');
 const axios = require('axios');
 
-// check if user_config.json exists
-if (!fs.existsSync('./user_config.json')) {
+let config = require('./user_config_DEFAULT.json')
+
+// Read the user_config.json file for user configuration options
+if (fs.existsSync('./user_config.json')) {
+	config = require('./user_config.json');
+} else {
 	// create ./user_config.json if it doesn't exist, by duplicating user_config_DEFAULT.json and renaming it
 	fs.copyFile('./user_config_DEFAULT.json', './user_config.json', (err) => {
 		if (err) throw err;
 		log('user_config.json was created. Edit it to manage user options.', true);
+		config = require('./user_config.json');
 	});
+
 }
-
-
-// Read the user_config.json file for user configuration options
-const config = require('./user_config.json');
 
 // Variables used for logging
 let userLogs = '';
@@ -158,7 +160,7 @@ function startPrompt() {
 								'5.) every 30 minutes\n' +
 								'6.) every hour\n' +
 								'7.) every 3 hours\n' +
-								'8.) every day\n\t`'
+								'8.) every day\n\t'
 						),
 					},
 				},
