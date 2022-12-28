@@ -112,7 +112,7 @@ No. It is required, and there is no website or web interface for this.
 ### Can I run this on my computer?
 Any computer that can run NodeJS can run this, although a stable internet connection and room for the posts to download will decrease the chance of random errors. If you face problems, submit an issue!
 
-### Why did you (mapleweekend) make this?
+### Why did you (josephrcox) make this?
 In the past, I have wanted to download subreddits for offline consumption. This makes it easy to do so and does not need OAUTH which I found annoying with many other tools. I also just wanted a fun tiny project to work on during vacation so I spent a couple of hours making and refining this. 
 
 ## Upcoming features
@@ -121,7 +121,7 @@ Please see the issues tab to see upcoming features and vote on what you want the
 ## Example log
 ```
 Welcome to Reddit Post Downloader! 
-Contribute @ https://github.com/mapleweekend/easy-reddit-downloader
+Contribute @ https://github.com/josephrcox/easy-reddit-downloader
 ALERT: A new version (v1.1.9) is available. 
 Please update to the latest version with 'git pull'.
 

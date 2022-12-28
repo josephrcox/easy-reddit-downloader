@@ -82,7 +82,7 @@ console.clear(); // Clear the console
 log(chalk.cyan('Welcome to Reddit Post Downloader! '), true);
 log(
 	chalk.red(
-		'Contribute @ https://github.com/mapleweekend/easy-reddit-downloader'
+		'Contribute @ https://github.com/josephrcox/easy-reddit-downloader'
 	),
 	true
 );
@@ -93,7 +93,7 @@ if (config.testingMode) {
 }
 
 // Make a GET request to the GitHub API to get the latest release
-request.get('https://api.github.com/repos/mapleweekend/easy-reddit-downloader/releases/latest', { headers: { 'User-Agent': 'Downloader'}}, (error, response, body) => {
+request.get('https://api.github.com/repos/josephrcox/easy-reddit-downloader/releases/latest', { headers: { 'User-Agent': 'Downloader'}}, (error, response, body) => {
   if (error) {
     console.error(error);
   } else {
@@ -367,9 +367,15 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 						} else {
 							// DOWNLOAD A SELF POST
 							let comments_string = '';
-
-							const postResponse = await axios.get(`${post.url}.json`);
-							const data = postResponse.data;
+							let postResponse = null;
+							let data = null;
+							try {
+								postResponse = await axios.get(`${post.url}.json`);
+								data = postResponse.data;
+							} catch(error) {
+								log(`Axios failure with ${post.url}`, true);
+								return checkIfDone(post.name);
+							}
 
 							// With text/self posts, we want to download the top comments as well.
 							// This is done by requesting the post's JSON data, and then iterating through each comment.
@@ -534,7 +540,7 @@ function onErr(err) {
 // We could check this inline but it's easier to read if it's a separate function,
 // and this ensures that we only check after the files are done being downloaded to the PC, not
 // just when the request is sent.
-function checkIfDone(lastPostId) {
+function checkIfDone(lastPostId, override) {
 	// Add up all downloaded/failed posts that have been downloaded so far, and check if it matches the
 	// number requested.
 
