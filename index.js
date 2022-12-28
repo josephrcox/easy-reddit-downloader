@@ -31,6 +31,7 @@ let date_string = `${date.getFullYear()} ${date.getMonth()} ${date.getDate()} at
 let startTime = null;
 
 let subreddit_the_user_is_downloading_from = 0; // Used to track which subreddit the user is downloading from
+let responseSize = -1; // Used to track the size of the response from the API call, aka how many posts are in the response
 
 // User-defined variables, these can be preset with the help of testingMode
 let timeBetweenRuns = 0; // in milliseconds, the time between runs. This is only used if repeatForever is true
@@ -289,7 +290,7 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 					''
 				);
 			} else {
-				return checkIfDone();
+				return checkIfDone("",true);
 			}
 		}
 
@@ -310,7 +311,9 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 			fs.mkdirSync(downloadDirectory);
 		}
 
-		data.data.children.forEach(async (child) => {
+		responseSize = data.data.children.length;
+
+		await data.data.children.forEach(async (child, i) => {
 			try {
 				const post = child.data;
 
@@ -320,26 +323,7 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 				// Determine the type of post. If no type is found, default to link as a last resort.
 				// If it accidentally downloads a self or media post as a link, it will still
 				// save properly.
-				if (post.post_hint === 'self' || post.is_self) {
-					postType = 0;
-				} else if (
-					post.post_hint === 'image' ||
-					post.post_hint === 'hosted:video'
-					|| (post.post_hint === 'rich:video') || (post.post_hint === 'link' && post.domain.includes('imgur'))
-				) {
-					postType = 1;
-				} else {
-					postType = 2;
-				}
-
-				log(
-					`Analyzing post with title: ${post.title}) and URL: ${post.url}`,
-					false
-				);
-				log(
-					`Post has type: ${postTypeOptions[postType]} due to their post hint: ${post.post_hint}`,
-					false
-				);
+				postType = getPostType(post, postTypeOptions);
 
 				// All posts should have URLs, so just make sure that it does.
 				// If the post doesn't have a URL, then it should be skipped.
@@ -485,6 +469,8 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 						false
 					);
 				}
+				
+				
 			} catch (e) {
 				log(e, true);
 			}
@@ -493,6 +479,30 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 		// throw the error
 		throw error;
 	}
+}
+
+function getPostType(post, postTypeOptions) {
+	if (post.post_hint === 'self' || post.is_self) {
+		postType = 0;
+	} else if (
+		post.post_hint === 'image' ||
+		post.post_hint === 'hosted:video'
+		|| (post.post_hint === 'rich:video') || (post.post_hint === 'link' && post.domain.includes('imgur') || post.domain.includes("i.redd.it"))
+	) {
+		postType = 1;
+	} else {
+		postType = 2;
+	}
+
+	log(
+		`Analyzing post with title: ${post.title}) and URL: ${post.url}`,
+		false
+	);
+	log(
+		`Post has type: ${postTypeOptions[postType]} due to their post hint: ${post.post_hint}`,
+		false
+	);
+	return postType;
 }
 
 async function downloadMediaFile(downloadURL, filePath, postName) {
@@ -544,7 +554,7 @@ function checkIfDone(lastPostId, override) {
 	// Add up all downloaded/failed posts that have been downloaded so far, and check if it matches the
 	// number requested.
 
-	if (numberOfPostsRemaining()[0] === 0) {
+	if (numberOfPostsRemaining()[0] === 0 || override || numberOfPostsRemaining()[1] === responseSize) {
 		// All done downloading posts from this subreddit
 		let endTime = new Date();
 		let timeDiff = endTime - startTime;
