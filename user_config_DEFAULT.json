@@ -18,5 +18,6 @@
     "download_media_posts": true,
     "download_link_posts": true,
     "download_comments": true,
-    "separate_clean_nsfw": false
+    "separate_clean_nsfw": false,
+    "redownload_posts": false
 }

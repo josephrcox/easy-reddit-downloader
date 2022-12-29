@@ -49,6 +49,7 @@ let downloadedPosts = {
 	media: 0,
 	link: 0,
 	failed: 0,
+	skipped_due_to_duplicate: 0,
 };
 
 // Repeat intervals in milliseconds if the user choses to repeat forever
@@ -98,7 +99,7 @@ request.get(
 	{ headers: { 'User-Agent': 'Downloader' } },
 	(error, response, body) => {
 		if (error) {
-			console.error(error);
+			log(error, false);
 		} else {
 			// Parse the response body to get the version number of the latest release
 			const latestRelease = JSON.parse(body);
@@ -328,9 +329,11 @@ function getPostType(post, postTypeOptions) {
 		postType = 0;
 	} else if (
 		post.post_hint === 'image' ||
-		((post.post_hint === 'rich:video') && !post.domain.includes("youtu")) ||
+		(post.post_hint === 'rich:video' && !post.domain.includes('youtu')) ||
 		post.post_hint === 'hosted:video' ||
-		(post.post_hint === 'link' && post.domain.includes('imgur') && !post.domain.includes("gallery")) ||
+		(post.post_hint === 'link' &&
+			post.domain.includes('imgur') &&
+			!post.domain.includes('gallery')) ||
 		post.domain.includes('i.redd.it')
 	) {
 		postType = 1;
@@ -401,59 +404,70 @@ async function downloadPost(post) {
 		let postTitleScrubbed = sanitizeFileName(post.title);
 
 		if (postType === 0) {
-			if (!config.download_self_posts) {
-				log(`Skipping self post with title: ${post.title}`, false);
+			let toDownload = await shouldWeDownload(
+				post.subreddit,
+				`${postTitleScrubbed}.txt`
+			);
+			if (!toDownload) {
+				downloadedPosts.skipped_due_to_duplicate += 1;
+				if (checkIfDone(post.name)) {
+					return;
+				}
 			} else {
-				// DOWNLOAD A SELF POST
-				let comments_string = '';
-				let postResponse = null;
-				let data = null;
-				try {
-					postResponse = await axios.get(`${post.url}.json`);
-					data = postResponse.data;
-				} catch (error) {
-					log(`Axios failure with ${post.url}`, true);
-					return checkIfDone(post.name);
-				}
-
-				// With text/self posts, we want to download the top comments as well.
-				// This is done by requesting the post's JSON data, and then iterating through each comment.
-				// We also iterate through the top nested comments (only one level deep).
-				// So we have a file output with the post title, the post text, the author, and the top comments.
-
-				comments_string += post.title + ' by ' + post.author + '\n\n';
-				comments_string += post.selftext + '\n';
-				comments_string +=
-					'------------------------------------------------\n\n';
-				if (config.download_comments) {
-					// If the user wants to download comments
-					comments_string += '--COMMENTS--\n\n';
-					data[1].data.children.forEach((child) => {
-						const comment = child.data;
-						comments_string += comment.author + ':\n';
-						comments_string += comment.body + '\n';
-						if (comment.replies) {
-							const top_reply = comment.replies.data.children[0].data;
-							comments_string += '\t>\t' + top_reply.author + ':\n';
-							comments_string += '\t>\t' + top_reply.body + '\n';
-						}
-						comments_string += '\n\n\n';
-					});
-				}
-
-				fs.writeFile(
-					`${downloadDirectory}/SELF -${postTitleScrubbed}.txt`,
-					comments_string,
-					function (err) {
-						if (err) {
-							log(err);
-						}
-						downloadedPosts.self += 1;
-						if (checkIfDone(post.name)) {
-							return;
-						}
+				if (!config.download_self_posts) {
+					log(`Skipping self post with title: ${post.title}`, false);
+				} else {
+					// DOWNLOAD A SELF POST
+					let comments_string = '';
+					let postResponse = null;
+					let data = null;
+					try {
+						postResponse = await axios.get(`${post.url}.json`);
+						data = postResponse.data;
+					} catch (error) {
+						log(`Axios failure with ${post.url}`, true);
+						return checkIfDone(post.name);
 					}
-				);
+
+					// With text/self posts, we want to download the top comments as well.
+					// This is done by requesting the post's JSON data, and then iterating through each comment.
+					// We also iterate through the top nested comments (only one level deep).
+					// So we have a file output with the post title, the post text, the author, and the top comments.
+
+					comments_string += post.title + ' by ' + post.author + '\n\n';
+					comments_string += post.selftext + '\n';
+					comments_string +=
+						'------------------------------------------------\n\n';
+					if (config.download_comments) {
+						// If the user wants to download comments
+						comments_string += '--COMMENTS--\n\n';
+						data[1].data.children.forEach((child) => {
+							const comment = child.data;
+							comments_string += comment.author + ':\n';
+							comments_string += comment.body + '\n';
+							if (comment.replies) {
+								const top_reply = comment.replies.data.children[0].data;
+								comments_string += '\t>\t' + top_reply.author + ':\n';
+								comments_string += '\t>\t' + top_reply.body + '\n';
+							}
+							comments_string += '\n\n\n';
+						});
+					}
+
+					fs.writeFile(
+						`${downloadDirectory}/${postTitleScrubbed}.txt`,
+						comments_string,
+						function (err) {
+							if (err) {
+								log(err);
+							}
+							downloadedPosts.self += 1;
+							if (checkIfDone(post.name)) {
+								return;
+							}
+						}
+					);
+				}
 			}
 		} else if (postType === 1) {
 			// DOWNLOAD A MEDIA POST
@@ -461,25 +475,32 @@ async function downloadPost(post) {
 				// Reddit stores fallback URL previews for some GIFs.
 				// Changing the URL to download to the fallback URL will download the GIF, in MP4 format.
 				if (post.preview.reddit_video_preview != undefined) {
-					log("Using fallback URL for Reddit's GIF preview." + post.preview.reddit_video_preview)
+					log(
+						"Using fallback URL for Reddit's GIF preview." +
+							post.preview.reddit_video_preview
+					);
 					downloadURL = post.preview.reddit_video_preview.fallback_url;
 					fileType = 'mp4';
 				} else if (post.url_overridden_by_dest.includes('.gifv')) {
 					// Luckily, you can just swap URLs on imgur with .gifv
 					// with ".mp4" to get the MP4 version. Amazing!
-					log("Replacing gifv with mp4")
+					log('Replacing gifv with mp4');
 					downloadURL = post.url_overridden_by_dest.replace('.gifv', '.mp4');
 					fileType = 'mp4';
 				}
-			} 
-			if (post.media != undefined && post.post_hint == "hosted:video") { 
+			}
+			if (post.media != undefined && post.post_hint == 'hosted:video') {
 				// If the post has a media object, then it's a video.
 				// We need to get the URL from the media object.
 				// This is because the URL in the post object is a fallback URL.
 				// The media object has the actual URL.
 				downloadURL = post.media.reddit_video.fallback_url;
 				fileType = 'mp4';
-			} else if (post.media != undefined && post.post_hint == "rich:video" && post.media.oembed.thumbnail_url != undefined) {
+			} else if (
+				post.media != undefined &&
+				post.post_hint == 'rich:video' &&
+				post.media.oembed.thumbnail_url != undefined
+			) {
 				// Common for gfycat links
 				downloadURL = post.media.oembed.thumbnail_url;
 				fileType = 'gif';
@@ -487,33 +508,55 @@ async function downloadPost(post) {
 			if (!config.download_media_posts) {
 				log(`Skipping media post with title: ${post.title}`, false);
 			} else {
-				downloadMediaFile(
-					downloadURL,
-					`${downloadDirectory}/MEDIA - ${postTitleScrubbed}.${fileType}`,
-					post.name
+				let toDownload = await shouldWeDownload(
+					post.subreddit,
+					`${postTitleScrubbed}.${fileType}`
 				);
+				if (!toDownload) {
+					downloadedPosts.skipped_due_to_duplicate += 1;
+					if (checkIfDone(post.name)) {
+						return;
+					}
+				} else {
+					downloadMediaFile(
+						downloadURL,
+						`${downloadDirectory}/${postTitleScrubbed}.${fileType}`,
+						post.name
+					);
+				}
 			}
 		} else if (postType === 2) {
 			if (!config.download_link_posts) {
 				log(`Skipping link post with title: ${post.title}`, false);
 			} else {
-				// DOWNLOAD A LINK POST
-				// With link posts, we create a simple HTML file that redirects to the post's URL.
-				// This enables the user to still "open" the link file, and it will redirect to the post.
-				// No comments or other data is stored.
-				let htmlFile = `<html><body><script type='text/javascript'>window.location.href = "${post.url}";</script></body></html>`;
-
-				fs.writeFile(
-					`${downloadDirectory}/LINK - ${postTitleScrubbed}.html`,
-					htmlFile,
-					function (err) {
-						if (err) throw err;
-						downloadedPosts.link += 1;
-						if (checkIfDone(post.name)) {
-							return;
-						}
-					}
+				let toDownload = await shouldWeDownload(
+					post.subreddit,
+					`${postTitleScrubbed}.html`
 				);
+				if (!toDownload) {
+					downloadedPosts.skipped_due_to_duplicate += 1;
+					if (checkIfDone(post.name)) {
+						return;
+					}
+				} else {
+					// DOWNLOAD A LINK POST
+					// With link posts, we create a simple HTML file that redirects to the post's URL.
+					// This enables the user to still "open" the link file, and it will redirect to the post.
+					// No comments or other data is stored.
+					let htmlFile = `<html><body><script type='text/javascript'>window.location.href = "${post.url}";</script></body></html>`;
+
+					fs.writeFile(
+						`${downloadDirectory}/${postTitleScrubbed}.html`,
+						htmlFile,
+						function (err) {
+							if (err) throw err;
+							downloadedPosts.link += 1;
+							if (checkIfDone(post.name)) {
+								return;
+							}
+						}
+					);
+				}
 			}
 		} else {
 			log('Failed to download: ' + post.title + 'with URL: ' + post.url);
@@ -533,6 +576,22 @@ async function downloadPost(post) {
 function downloadNextSubreddit() {
 	currentSubredditIndex += 1;
 	downloadSubredditPosts(subredditList[currentSubredditIndex]);
+}
+
+function shouldWeDownload(subreddit, postTitleWithPrefixAndExtension) {
+	if (config.redownload_posts === true || config.redownload_posts === undefined) {
+		if (config.redownload_posts === undefined) {
+			log(chalk.red("ALERT: Please note that the 'redownload_posts' option is now available in user_config. See the default JSON for example usage."), true)
+		}
+		return true;
+	} else {
+		// Check if the post in the subreddit folder already exists.
+		// If it does, we don't need to download it again.
+		let postExists = fs.existsSync(
+			`${downloadDirectory}/${postTitleWithPrefixAndExtension}`
+		);
+		return !postExists;
+	}
 }
 
 function onErr(err) {
@@ -580,6 +639,7 @@ function checkIfDone(lastPostId, override) {
 			media: 0,
 			link: 0,
 			failed: 0,
+			skipped_due_to_duplicate: 0,
 		};
 		if (currentSubredditIndex < subredditList.length - 1) {
 			downloadNextSubreddit();
@@ -623,7 +683,8 @@ function numberOfPostsRemaining() {
 		downloadedPosts.self +
 		downloadedPosts.media +
 		downloadedPosts.link +
-		downloadedPosts.failed;
+		downloadedPosts.failed +
+		downloadedPosts.skipped_due_to_duplicate;
 	return [numberOfPosts - total, total];
 }
 
