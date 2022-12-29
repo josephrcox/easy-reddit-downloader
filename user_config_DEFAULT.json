@@ -19,5 +19,6 @@
     "download_link_posts": true,
     "download_comments": true,
     "separate_clean_nsfw": false,
-    "redownload_posts": false
+    "redownload_posts": false,
+    "detailed_logs": false
 }
