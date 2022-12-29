@@ -323,23 +323,22 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 }
 
 function getPostType(post, postTypeOptions) {
+	log(`Analyzing post with title: ${post.title}) and URL: ${post.url}`, false);
 	if (post.post_hint === 'self' || post.is_self) {
 		postType = 0;
 	} else if (
 		post.post_hint === 'image' ||
 		((post.post_hint === 'rich:video') && !post.domain.includes("youtu")) ||
 		post.post_hint === 'hosted:video' ||
-		(post.post_hint === 'link' && post.domain.includes('imgur')) ||
+		(post.post_hint === 'link' && post.domain.includes('imgur') && !post.domain.includes("gallery")) ||
 		post.domain.includes('i.redd.it')
 	) {
 		postType = 1;
 	} else {
 		postType = 2;
 	}
-
-	log(`Analyzing post with title: ${post.title}) and URL: ${post.url}`, false);
 	log(
-		`Post has type: ${postTypeOptions[postType]} due to their post hint: ${post.post_hint}`,
+		`Post has type: ${postTypeOptions[postType]} due to their post hint: ${post.post_hint} and domain: ${post.domain}`,
 		false
 	);
 	return postType;
@@ -480,6 +479,10 @@ async function downloadPost(post) {
 				// The media object has the actual URL.
 				downloadURL = post.media.reddit_video.fallback_url;
 				fileType = 'mp4';
+			} else if (post.media != undefined && post.post_hint == "rich:video" && post.media.oembed.thumbnail_url != undefined) {
+				// Common for gfycat links
+				downloadURL = post.media.oembed.thumbnail_url;
+				fileType = 'gif';
 			}
 			if (!config.download_media_posts) {
 				log(`Skipping media post with title: ${post.title}`, false);
