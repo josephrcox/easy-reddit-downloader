@@ -9,7 +9,6 @@ const chalk = require('chalk');
 const axios = require('axios');
 
 let config = require('./user_config_DEFAULT.json');
-const e = require('express');
 
 // Read the user_config.json file for user configuration options
 if (fs.existsSync('./user_config.json')) {
