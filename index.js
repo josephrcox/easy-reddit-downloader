@@ -30,6 +30,8 @@ let date_string = `${date.getFullYear()} ${
 	date.getMonth() + 1
 } ${date.getDate()} at ${date.getHours()}-${date.getMinutes()}-${date.getSeconds()}`;
 let startTime = null;
+let lastAPICallForSubreddit = false;
+let currentAPICall = null;
 
 let currentSubredditIndex = 0; // Used to track which subreddit the user is downloading from
 let responseSize = -1; // Used to track the size of the response from the API call, aka how many posts are in the response
@@ -189,6 +191,9 @@ function startPrompt() {
 					subredditList[i] = subredditList[i].replace(/\s/g, '');
 				}
 				numberOfPosts = result.post_count;
+				if (numberOfPosts.toLowerCase() === "all") {
+					numberOfPosts = 9999999999999999999999;
+				}
 				sorting = result.sorting.replace(/\s/g, '');
 				time = result.time.replace(/\s/g, '');
 				repeatForever = true;
@@ -205,6 +210,7 @@ function startPrompt() {
 				}
 
 				// With the data gathered, call the APIs and download the posts
+				startTime = new Date();
 				downloadSubredditPosts(subredditList[0], '');
 			}
 		);
@@ -270,13 +276,19 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 		let data = null;
 
 		try {
-			startTime = new Date();
 			response = await axios.get(
 				`https://www.reddit.com/r/${subreddit}/${sorting}/.json?sort=${sorting}&t=${time}&limit=${postsRemaining}&after=${lastPostId}`
 			);
 			data = await response.data;
+			currentAPICall = data;
 			if (data.message == 'Not Found' || data.data.children.length == 0) {
 				throw error;
+			}
+			if (data.data.children.length < postsRemaining) {
+				lastAPICallForSubreddit = true;
+				postsRemaining = data.data.children.length;
+			} else {
+				lastAPICallForSubreddit = false;
 			}
 		} catch (err) {
 			log(
@@ -316,12 +328,12 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 		await data.data.children.forEach(async (child, i) => {
 			try {
 				const post = child.data;
-
 				downloadPost(post);
 			} catch (e) {
 				log(e, true);
 			}
 		});
+		
 	} catch (error) {
 		// throw the error
 		throw error;
@@ -338,7 +350,7 @@ function getPostType(post, postTypeOptions) {
 		post.post_hint === 'hosted:video' ||
 		(post.post_hint === 'link' &&
 			post.domain.includes('imgur') &&
-			!post.domain.includes('gallery')) ||
+			!post.url_overridden_by_dest.includes('gallery')) ||
 		post.domain.includes('i.redd.it')
 	) {
 		postType = 1;
@@ -493,6 +505,19 @@ async function downloadPost(post) {
 					log('Replacing gifv with mp4', true);
 					downloadURL = post.url_overridden_by_dest.replace('.gifv', '.mp4');
 					fileType = 'mp4';
+				} else {
+					let sourceURL = post.preview.images[0].source.url;
+					// set fileType to whatever imageFormat item is in the sourceURL
+					for (let i=0; i<imageFormats.length; i++) {
+						if (
+							sourceURL
+								.toLowerCase()
+								.includes(imageFormats[i].toLowerCase())
+						) {
+							fileType = imageFormats[i];
+							break;
+						}
+					}
 				}
 			}
 			if (post.media != undefined && post.post_hint == 'hosted:video') {
@@ -630,6 +655,7 @@ function checkIfDone(lastPostId, override) {
 	// Add up all downloaded/failed posts that have been downloaded so far, and check if it matches the
 	// number requested.
 	if (
+		(lastAPICallForSubreddit && (lastPostId === currentAPICall.data.children[responseSize - 1].data.name)) ||
 		numberOfPostsRemaining()[0] === 0 ||
 		override ||
 		(numberOfPostsRemaining()[1] === responseSize && responseSize < 100)
@@ -643,51 +669,65 @@ function checkIfDone(lastPostId, override) {
 			.toString()
 			.substring(0, 5);
 
-		log(
-			'🎉 All done downloading posts from ' + downloadedPosts.subreddit + '!',
-			false
-		);
-		log(JSON.stringify(downloadedPosts), true);
-
-		log(
-			`\n📈 Downloading took ${timeDiff} seconds, at about ${msPerPost} seconds/post`,
-			true
-		);
-
-		// default values for next run (important if being run multiple times)
-		downloadedPosts = {
-			subreddit: '',
-			self: 0,
-			media: 0,
-			link: 0,
-			failed: 0,
-			skipped_due_to_duplicate: 0,
-			skipped_due_to_fileType: 0,
-		};
-		startTime = null;
-
-		if (currentSubredditIndex < subredditList.length - 1) {
-			downloadNextSubreddit();
-		} else if (repeatForever) {
-			currentSubredditIndex = 0;
+		log("Validating that all posts were downloaded...", false);
+		setTimeout(() => {
 			log(
-				`⏲️ Waiting ${timeBetweenRuns / 1000} seconds before rerunning...`,
+				'🎉 All done downloading posts from ' + downloadedPosts.subreddit + '!',
 				false
 			);
-			setTimeout(function () {
-				downloadSubredditPosts(subredditList[0], '');
-			}, timeBetweenRuns);
-		} else {
-			startPrompt();
-		}
-		return true;
+			log(JSON.stringify(downloadedPosts), true);
+	
+			log(
+				`\n📈 Downloading took ${timeDiff} seconds, at about ${msPerPost} seconds/post`,
+				true
+			);
+	
+			// default values for next run (important if being run multiple times)
+			downloadedPosts = {
+				subreddit: '',
+				self: 0,
+				media: 0,
+				link: 0,
+				failed: 0,
+				skipped_due_to_duplicate: 0,
+				skipped_due_to_fileType: 0,
+			};
+			startTime = null;
+	
+			if (currentSubredditIndex < subredditList.length - 1) {
+				downloadNextSubreddit();
+			} else if (repeatForever) {
+				currentSubredditIndex = 0;
+				log(
+					`⏲️ Waiting ${timeBetweenRuns / 1000} seconds before rerunning...`,
+					false
+				);
+				setTimeout(function () {
+					downloadSubredditPosts(subredditList[0], '');
+				}, timeBetweenRuns);
+			} else {
+				startPrompt();
+			}
+			return true;
+		}, 3000);
+		
 	} else {
-		log(
-			`Still downloading posts... (${
-				numberOfPostsRemaining()[1]
-			}/${numberOfPosts})`,
-			true
-		);
+		if (numberOfPosts >= 99999999999999999999) {
+			log(
+				`Still downloading posts from ${chalk.cyan(subredditList[currentSubredditIndex])}... (${
+					numberOfPostsRemaining()[1]
+				}/all)`,
+				false
+			);
+		} else {
+			log(
+				`Still downloading posts from ${chalk.cyan(subredditList[currentSubredditIndex])}... (${
+					numberOfPostsRemaining()[1]
+				}/${numberOfPosts})`,
+				false
+			);
+		}
+
 		for (let i = 0; i < Object.keys(downloadedPosts).length; i++) {
 			log(
 				`\t- ${Object.keys(downloadedPosts)[i]}: ${
@@ -698,7 +738,6 @@ function checkIfDone(lastPostId, override) {
 		}
 		log('\n', true);
 
-		// check if total is divisible by 100
 		if (numberOfPostsRemaining()[1] % 100 == 0) {
 			return downloadSubredditPosts(
 				subredditList[currentSubredditIndex],
@@ -750,7 +789,11 @@ function log(message, detailed) {
 			logFileName += `${subredditListString} - `;
 		}
 		if (config.local_logs_naming_scheme.showNumberOfPosts) {
-			logFileName += `${numberOfPosts} - `;
+			if (numberOfPosts < 999999999999999999) {
+				logFileName += `ALL - `;
+			} else {
+				logFileName += `${numberOfPosts} - `;
+			}
 		}
 
 		if (logFileName.endsWith(' - ')) {
