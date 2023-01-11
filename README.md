@@ -13,6 +13,7 @@
 7. Very few Node dependencies so it's fast to clone and run.
 8. Local logging so you can see what you downloaded in the past and the developer logs.
 9. Null & undefined checking for all post types to prevent errors. 🧠
+10. Customizable file naming and file structure. 📁
 
 ## Setup & Usage
 1. Clone or download this repo
@@ -27,10 +28,15 @@ Then, you are ready to go! Type either of the commands below to start it up.
 
 After the script begins, you will be asked a few questions about what you want to download. Fill out the questions (be careful not to have any typos) and it will download all post types from the subreddit(s) you entered with your sorting options. 
 
-#### user_config.json
+### user_config.json
 After the first launch, a file called `user_config.json` will be created for you. You can modify this file at anytime to set your personal preferences. This will not be reset during Git pulls or updates, so it is perfect if you want a very specific setup for a long time. 
 
 If you mess up the user_config.json file, there will always be a default version called `user_config_DEFAULT.json'. This may change in the future to enable more features. 
+
+#### File-naming-scheme
+This is the naming scheme for the files that are downloaded. To reduce the chance of duplicate posts and errors, we recommend using the default naming scheme. 
+
+Problems can happen if you just show the author, because if that author writes multiple posts, then it would overwrite the previous posts. Similiar problems can happen if you attempt to only use the post title in subreddits that have a lot of posts with the same names. 
 
 ## Post types
 ### Text/self posts
