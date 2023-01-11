@@ -10,18 +10,6 @@ const axios = require('axios');
 
 let config = require('./user_config_DEFAULT.json');
 
-// Read the user_config.json file for user configuration options
-if (fs.existsSync('./user_config.json')) {
-	config = require('./user_config.json');
-} else {
-	// create ./user_config.json if it doesn't exist, by duplicating user_config_DEFAULT.json and renaming it
-	fs.copyFile('./user_config_DEFAULT.json', './user_config.json', (err) => {
-		if (err) throw err;
-		log('user_config.json was created. Edit it to manage user options.', true);
-		config = require('./user_config.json');
-	});
-}
-
 // Variables used for logging
 let userLogs = '';
 const logFormat = 'txt';
@@ -86,7 +74,7 @@ if (testingMode) {
 console.clear(); // Clear the console
 log(chalk.cyan('Welcome to Reddit Post Downloader! '), false);
 log(
-	chalk.red(
+	chalk.yellow(
 		'Contribute @ https://github.com/josephrcox/easy-reddit-downloader'
 	),
 	false
@@ -97,6 +85,63 @@ if (config.testingMode) {
 	log('Testing mode options: ' + JSON.stringify(config.testingMode), true);
 }
 
+// Read the user_config.json file for user configuration options
+if (fs.existsSync('./user_config.json')) {
+	config = require('./user_config.json');
+	checkConfig();
+} else {
+	// create ./user_config.json if it doesn't exist, by duplicating user_config_DEFAULT.json and renaming it
+	fs.copyFile('./user_config_DEFAULT.json', './user_config.json', (err) => {
+		if (err) throw err;
+		log('user_config.json was created. Edit it to manage user options.', true);
+		config = require('./user_config.json');
+	});
+	checkConfig();
+}
+
+function checkConfig() {
+	let warnTheUser = false;
+	let quitApplicaton = false;
+
+	let count =
+		(config.file_naming_scheme.showDate === true) +
+		(config.file_naming_scheme.showAuthor === true) +
+		(config.file_naming_scheme.showTitle === true);
+	if (count === 0) {
+		quitApplicaton = true;
+	} else if (count < 2) {
+		warnTheUser = true;
+	}
+
+	if (warnTheUser) {
+		log(
+			chalk.red(
+				'WARNING: Your file naming scheme (user_config.json) is poorly set, we recommend changing it.'
+			),
+			false
+		);
+	}
+
+	if (quitApplicaton) {
+		log(
+			chalk.red(
+				'ALERT: Your file naming scheme (user_config.json) does not have any options set. You can not download posts without filenames. Aborting. '
+			),
+			false
+		);
+		process.exit(1);
+	}
+
+	if (quitApplicaton || warnTheUser) {
+		log(
+			chalk.red(
+				'Read about recommended naming schemes here - https://github.com/josephrcox/easy-reddit-downloader/blob/main/README.md#File-naming-scheme'
+			),
+			false
+		);
+	}
+}
+
 // Make a GET request to the GitHub API to get the latest release
 request.get(
 	'https://api.github.com/repos/josephrcox/easy-reddit-downloader/releases/latest',
@@ -105,7 +150,7 @@ request.get(
 		if (error) {
 			log(error, true);
 		} else {
-			// Parse the response body to get the version number of the latest release
+			// Parse the re∏sponse body to get the version number of the latest release
 			const latestRelease = JSON.parse(body);
 			const latestVersion = latestRelease.tag_name;
 
@@ -191,7 +236,7 @@ function startPrompt() {
 					subredditList[i] = subredditList[i].replace(/\s/g, '');
 				}
 				numberOfPosts = result.post_count;
-				if (numberOfPosts.toLowerCase() === "all") {
+				if (numberOfPosts.toLowerCase() === 'all') {
 					numberOfPosts = 9999999999999999999999;
 				}
 				sorting = result.sorting.replace(/\s/g, '');
@@ -333,7 +378,6 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 				log(e, true);
 			}
 		});
-		
 	} catch (error) {
 		// throw the error
 		throw error;
@@ -419,6 +463,7 @@ async function downloadPost(post) {
 		let fileType = downloadURL.split('.').pop();
 		// Post titles can be really long and have invalid characters, so we need to clean them up.
 		let postTitleScrubbed = sanitizeFileName(post.title);
+		postTitleScrubbed = getFileName(post);
 
 		if (postType === 0) {
 			let toDownload = await shouldWeDownload(
@@ -508,11 +553,9 @@ async function downloadPost(post) {
 				} else {
 					let sourceURL = post.preview.images[0].source.url;
 					// set fileType to whatever imageFormat item is in the sourceURL
-					for (let i=0; i<imageFormats.length; i++) {
+					for (let i = 0; i < imageFormats.length; i++) {
 						if (
-							sourceURL
-								.toLowerCase()
-								.includes(imageFormats[i].toLowerCase())
+							sourceURL.toLowerCase().includes(imageFormats[i].toLowerCase())
 						) {
 							fileType = imageFormats[i];
 							break;
@@ -655,7 +698,9 @@ function checkIfDone(lastPostId, override) {
 	// Add up all downloaded/failed posts that have been downloaded so far, and check if it matches the
 	// number requested.
 	if (
-		(lastAPICallForSubreddit && (lastPostId === currentAPICall.data.children[responseSize - 1].data.name)) ||
+		(lastAPICallForSubreddit &&
+			lastPostId ===
+				currentAPICall.data.children[responseSize - 1].data.name) ||
 		numberOfPostsRemaining()[0] === 0 ||
 		override ||
 		(numberOfPostsRemaining()[1] === responseSize && responseSize < 100)
@@ -669,19 +714,19 @@ function checkIfDone(lastPostId, override) {
 			.toString()
 			.substring(0, 5);
 
-		log("Validating that all posts were downloaded...", false);
+		log('Validating that all posts were downloaded...', false);
 		setTimeout(() => {
 			log(
 				'🎉 All done downloading posts from ' + downloadedPosts.subreddit + '!',
 				false
 			);
 			log(JSON.stringify(downloadedPosts), true);
-	
+
 			log(
 				`\n📈 Downloading took ${timeDiff} seconds, at about ${msPerPost} seconds/post`,
 				true
 			);
-	
+
 			// default values for next run (important if being run multiple times)
 			downloadedPosts = {
 				subreddit: '',
@@ -693,7 +738,7 @@ function checkIfDone(lastPostId, override) {
 				skipped_due_to_fileType: 0,
 			};
 			startTime = null;
-	
+
 			if (currentSubredditIndex < subredditList.length - 1) {
 				downloadNextSubreddit();
 			} else if (repeatForever) {
@@ -710,20 +755,19 @@ function checkIfDone(lastPostId, override) {
 			}
 			return true;
 		}, 3000);
-		
 	} else {
 		if (numberOfPosts >= 99999999999999999999) {
 			log(
-				`Still downloading posts from ${chalk.cyan(subredditList[currentSubredditIndex])}... (${
-					numberOfPostsRemaining()[1]
-				}/all)`,
+				`Still downloading posts from ${chalk.cyan(
+					subredditList[currentSubredditIndex]
+				)}... (${numberOfPostsRemaining()[1]}/all)`,
 				false
 			);
 		} else {
 			log(
-				`Still downloading posts from ${chalk.cyan(subredditList[currentSubredditIndex])}... (${
-					numberOfPostsRemaining()[1]
-				}/${numberOfPosts})`,
+				`Still downloading posts from ${chalk.cyan(
+					subredditList[currentSubredditIndex]
+				)}... (${numberOfPostsRemaining()[1]}/${numberOfPosts})`,
 				false
 			);
 		}
@@ -746,6 +790,40 @@ function checkIfDone(lastPostId, override) {
 		}
 		return false;
 	}
+}
+
+function getFileName(post) {
+	let fileName = '';
+	if (
+		config.file_naming_scheme.showDate ||
+		config.file_naming_scheme.showDate === undefined
+	) {
+		let timestamp = post.created;
+		var date = new Date(timestamp * 1000);
+		var year = date.getFullYear();
+		var month = (date.getMonth() + 1).toString().padStart(2, '0');
+		var day = date.getDate().toString().padStart(2, '0');
+		fileName += `${year}-${month}-${day}`;
+	}
+	if (
+		config.file_naming_scheme.showAuthor ||
+		config.file_naming_scheme.showAuthor === undefined
+	) {
+		fileName += `_${post.author}`;
+	}
+	if (
+		config.file_naming_scheme.showTitle ||
+		config.file_naming_scheme.showTitle === undefined
+	) {
+		let title = sanitizeFileName(post.title);
+		fileName += `_${title}`;
+	}
+	// The max length for most systems is about 255. To give some wiggle room, I'm doing 240
+	if (fileName.length > 240) {
+		fileName = fileName.substring(0, 240);
+	}
+
+	return fileName;
 }
 
 function numberOfPostsRemaining() {
@@ -812,5 +890,5 @@ function log(message, detailed) {
 
 // sanitize function for file names so that they work on Mac, Windows, and Linux
 function sanitizeFileName(fileName) {
-	return fileName.replace(/[/\\?%*:|"<>]/g, '-').substring(0, 200);
+	return fileName.replace(/[/\\?%*:|"<>]/g, '-').replace(/([^/])\/([^/])/g, "$1_$2");
 }
