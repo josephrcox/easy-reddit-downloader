@@ -57,6 +57,20 @@ const repeatIntervals = {
 	8: 1000 * 60 * 60 * 24, // 24 hours
 };
 
+// Read the user_config.json file for user configuration options
+if (fs.existsSync('./user_config.json')) {
+	config = require('./user_config.json');
+	checkConfig();
+} else {
+	// create ./user_config.json if it doesn't exist, by duplicating user_config_DEFAULT.json and renaming it
+	fs.copyFile('./user_config_DEFAULT.json', './user_config.json', (err) => {
+		if (err) throw err;
+		log('user_config.json was created. Edit it to manage user options.', true);
+		config = require('./user_config.json');
+	});
+	checkConfig();
+}
+
 // Testing Mode for developer testing. This enables you to hardcode
 // the variables above and skip the prompt.
 // To edit, go into the user_config.json file.
@@ -83,20 +97,6 @@ log(
 log('User config: ' + JSON.stringify(config), true);
 if (config.testingMode) {
 	log('Testing mode options: ' + JSON.stringify(config.testingMode), true);
-}
-
-// Read the user_config.json file for user configuration options
-if (fs.existsSync('./user_config.json')) {
-	config = require('./user_config.json');
-	checkConfig();
-} else {
-	// create ./user_config.json if it doesn't exist, by duplicating user_config_DEFAULT.json and renaming it
-	fs.copyFile('./user_config_DEFAULT.json', './user_config.json', (err) => {
-		if (err) throw err;
-		log('user_config.json was created. Edit it to manage user options.', true);
-		config = require('./user_config.json');
-	});
-	checkConfig();
 }
 
 function checkConfig() {
