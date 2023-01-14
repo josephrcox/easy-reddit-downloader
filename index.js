@@ -3,7 +3,7 @@ const { version } = require('./package.json');
 
 // NodeJS Dependencies
 const fs = require('fs');
-const prompt = require('prompt');
+const prompts = require('prompts');
 var colors = require('@colors/colors/safe');
 const chalk = require('chalk');
 const axios = require('axios');
@@ -177,89 +177,94 @@ function startScript() {
 	}
 }
 
-function startPrompt() {
-	prompt.start();
-	prompt.message = ''; // remove the default prompt message
-	prompt.delimiter = ''; // removes the delimter between the prompt and the input ("prompt: ")
+async function startPrompt() {
+	const questions = [
+		{
+			type: 'text',
+			name: 'subreddit',
+			message:
+				'Which subreddits or users would you like to download? You may submit multiple separated by commas (no spaces).',
+			validate: (value) =>
+				value.length < 1 ? `Please enter at least one subreddit or user` : true,
+		},
+		{
+			type: 'number',
+			name: 'numberOfPosts',
+			message: 'How many posts would you like to attempt to download? If you would like to download all posts, enter 0.',
+			validate: (value) =>
+				// check if value is a number
+				!isNaN(value) ? true : `Please enter a number`,
+		},
+		{
+			type: 'text',
+			name: 'sorting',
+			message:
+				'How would you like to sort? (top, new, hot, rising, controversial)',
+			validate: (value) =>
+				value.toLowerCase() === 'top' ||
+				value.toLowerCase() === 'new' ||
+				value.toLowerCase() === 'hot' ||
+				value.toLowerCase() === 'rising' ||
+				value.toLowerCase() === 'controversial'
+					? true
+					: `Please enter a valid sorting method`,
+		},
+		{
+			type: 'text',
+			name: 'time',
+			message: 'During what time period? (hour, day, week, month, year, all)',
+			validate: (value) =>
+				value.toLowerCase() === 'hour' ||
+				value.toLowerCase() === 'day' ||
+				value.toLowerCase() === 'week' ||
+				value.toLowerCase() === 'month' ||
+				value.toLowerCase() === 'year' ||
+				value.toLowerCase() === 'all'
+					? true
+					: `Please enter a valid time period`,
+		},
+		{
+			type: 'toggle',
+			name: 'repeatForever',
+			message: 'Would you like to run this on repeat?',
+			initial: true,
+			active: 'yes',
+			inactive: 'no',
+		},
+		{
+			type: (prev) => (prev == true ? 'number' : null),
+			name: 'timeBetweenRuns',
+			message: 'How often would you like to run this? (in ms)',
+		},
+	];
 
-	// On first exec, this will always run.
-	// But if repeatForever is set to true (by the user) then this will
-	// run again after the timeBetweenRuns interval
-	if (!repeatForever) {
-		prompt.get(
-			{
-				properties: {
-					subreddit: {
-						description: colors.magenta(
-							'What subreddit would you like to download?' +
-								' You may submit multiple separated by commas (no spaces).\n\t'
-						),
-					},
-					post_count: {
-						description: colors.blue(
-							'How many posts do you want to go through?' +
-								'(more posts = more downloads, but takes longer)\n\t'
-						),
-					},
-					sorting: {
-						description: colors.yellow(
-							'How would you like to sort? (top, new, hot, rising, controversial)\n\t'
-						),
-					},
-					time: {
-						description: colors.green(
-							'What time period? (hour, day, week, month, year, all)\n\t'
-						),
-					},
-					repeat: {
-						description: colors.red(
-							'How often should this be run? \nManually enter number other than the options below for manual entry, i.e. "500" for every 0.5 second \n' +
-								'1.) one time\n' +
-								'2.) every 0.5 minute\n' +
-								'3.) every minute\n' +
-								'4.) every 5 minutes\n' +
-								'5.) every 30 minutes\n' +
-								'6.) every hour\n' +
-								'7.) every 3 hours\n' +
-								'8.) every day\n\t'
-						),
-					},
-				},
-			},
-			function (err, result) {
-				if (err) {
-					return onErr(err);
-				}
-				subredditList = result.subreddit.split(','); // the user enters subreddits separated by commas
-				// clean up the subreddit list in case the user puts in invalid chars
-				for (let i = 0; i < subredditList.length; i++) {
-					subredditList[i] = subredditList[i].replace(/\s/g, '');
-				}
-				numberOfPosts = result.post_count;
-				if (numberOfPosts.toLowerCase() === 'all') {
-					numberOfPosts = 9999999999999999999999;
-				}
-				sorting = result.sorting.replace(/\s/g, '');
-				time = result.time.replace(/\s/g, '');
-				repeatForever = true;
-				if (result.repeat == 1) {
-					repeatForever = false;
-				}
-				if (result.repeat < 1 || result.repeat > 8) {
-					if (result.repeat < 0) {
-						result.repeat = 0;
-					}
-					timeBetweenRuns = result.repeat;
-				} else {
-					timeBetweenRuns = repeatIntervals[result.repeat] || 0;
-				}
+	const result = await prompts(questions);
+	subredditList = result.subreddit.split(','); // the user enters subreddits separated by commas
+	repeatForever = result.repeatForever
+	numberOfPosts = result.numberOfPosts;
+	sorting = result.sorting.replace(/\s/g, '');
+	time = result.time.replace(/\s/g, '');
 
-				// With the data gathered, call the APIs and download the posts
-				startTime = new Date();
-				downloadSubredditPosts(subredditList[0], '');
-			}
-		);
+	// clean up the subreddit list in case the user puts in invalid chars
+	for (let i = 0; i < subredditList.length; i++) {
+		subredditList[i] = subredditList[i].replace(/\s/g, '');
 	}
+	console.log(subredditList)
+
+	if (numberOfPosts === 0) {
+		numberOfPosts = 9999999999999999999999;
+	}
+
+	if (repeatForever) {
+		if (result.repeat < 0) {
+			result.repeat = 0;
+		}
+		timeBetweenRuns = result.timeBetweenRuns; // the user enters the time between runs in ms
+	} 
+
+	// With the data gathered, call the APIs and download the posts
+	startTime = new Date();
+	downloadSubredditPosts(subredditList[0], '');
 }
 
 function makeDirectories() {
@@ -890,5 +895,7 @@ function log(message, detailed) {
 
 // sanitize function for file names so that they work on Mac, Windows, and Linux
 function sanitizeFileName(fileName) {
-	return fileName.replace(/[/\\?%*:|"<>]/g, '-').replace(/([^/])\/([^/])/g, "$1_$2");
+	return fileName
+		.replace(/[/\\?%*:|"<>]/g, '-')
+		.replace(/([^/])\/([^/])/g, '$1_$2');
 }
