@@ -33,6 +33,8 @@ let time = 'all'; // What time period to sort by (hour, day, week, month, year, 
 let repeatForever = false; // If true, the program will repeat every timeBetweenRuns milliseconds
 let downloadDirectory = ''; // Where to download the files to, defined when
 
+let currentUserAfter = ''; // Used to track the after value for the API call, this is used to get the next X posts
+
 // Default object to track the downloaded posts by type,
 // and the subreddit downloading from.
 let downloadedPosts = {
@@ -191,24 +193,26 @@ function startPrompt() {
 				properties: {
 					subreddit: {
 						description: colors.magenta(
-							'What subreddit would you like to download?' +
-								' You may submit multiple separated by commas (no spaces).\n\t'
+							'Which subreddits or users would you like to download?' + 
+								' You may submit multiple separated by commas (no spaces). For users, use "u/USERNAME" syntax.\n\t',
 						),
 					},
 					post_count: {
 						description: colors.blue(
 							'How many posts do you want to go through?' +
-								'(more posts = more downloads, but takes longer)\n\t'
+								' (more posts = more downloads, but takes longer)\n\t'
 						),
 					},
 					sorting: {
 						description: colors.yellow(
-							'How would you like to sort? (top, new, hot, rising, controversial)\n\t'
+							'How would you like to sort? (top, new, hot, rising, controversial)\n\t',
+							' NOTE: Not applicable to user downloads.\n\t'
 						),
 					},
 					time: {
 						description: colors.green(
-							'What time period? (hour, day, week, month, year, all)\n\t'
+							'What time period? (hour, day, week, month, year, all)\n\t',
+							' NOTE: Not applicable to user downloads.\n\t'
 						),
 					},
 					repeat: {
@@ -268,6 +272,9 @@ function makeDirectories() {
 	if (!fs.existsSync('./downloads')) {
 		fs.mkdirSync('./downloads');
 	}
+	if (!fs.existsSync('./downloads/users')) {
+		fs.mkdirSync('./downloads/users');
+	}
 	if (config.separate_clean_nsfw) {
 		if (!fs.existsSync('./downloads/clean')) {
 			fs.mkdirSync('./downloads/clean');
@@ -279,6 +286,13 @@ function makeDirectories() {
 }
 
 async function downloadSubredditPosts(subreddit, lastPostId) {
+	let isUser = false;
+	if (subreddit.includes('u/' || 'user/' || 'users/' || 'u_' || '/u/')) {
+		isUser = true;
+		subreddit = subreddit.split('u/').pop();
+		console.log(subreddit)
+		downloadUser(subreddit, lastPostId);
+	}
 	let postsRemaining = numberOfPostsRemaining()[0];
 	if (postsRemaining <= 0) {
 		// If we have downloaded enough posts, move on to the next subreddit
@@ -311,20 +325,39 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 
 		// Use log function to log a string
 		// as well as a boolean if the log should be displayed to the user.
-		log(
-			`\n\n👀 Requesting posts from
-		https://www.reddit.com/r/${subreddit}/${sorting}/.json?sort=${sorting}&t=${time}&limit=${postsRemaining}&after=${lastPostId}\n`,
-			true
-		);
+		if (isUser) {
+			log(
+				`\n\n👀 Requesting posts from
+				https://www.reddit.com/user/${subreddit.replace('u/', '')}/${sorting}/.json?sort=${sorting}&t=${time}&limit=${postsRemaining}&after=${lastPostId}\n`,
+				true
+			);
+		} else {
+			log(
+				`\n\n👀 Requesting posts from
+			https://www.reddit.com/r/${subreddit}/${sorting}/.json?sort=${sorting}&t=${time}&limit=${postsRemaining}&after=${lastPostId}\n`,
+				true
+			);
+		}
+
 		// Get the top posts from the subreddit
 		let response = null;
 		let data = null;
 
 		try {
-			response = await axios.get(
-				`https://www.reddit.com/r/${subreddit}/${sorting}/.json?sort=${sorting}&t=${time}&limit=${postsRemaining}&after=${lastPostId}`
-			);
+			if (isUser) {
+				response = await axios.get(
+					`https://www.reddit.com/user/${subreddit.replace('u/', '')}/${sorting}/.json?sort=${sorting}&t=${time}&limit=${postsRemaining}&after=${lastPostId}`
+				);
+			} else {
+				response = await axios.get(
+					`https://www.reddit.com/r/${subreddit}/.json`
+				);
+			}
+
 			data = await response.data;
+
+			log(JSON.stringify(data), true);
+			
 			currentAPICall = data;
 			if (data.message == 'Not Found' || data.data.children.length == 0) {
 				throw error;
@@ -374,6 +407,115 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 			try {
 				const post = child.data;
 				downloadPost(post);
+			} catch (e) {
+				log(e, true);
+			}
+		});
+	} catch (error) {
+		// throw the error
+		throw error;
+	}
+}
+
+async function downloadUser(user, currentUserAfter) {
+	let lastPostId = currentUserAfter;
+	let postsRemaining = numberOfPostsRemaining()[0];
+	if (postsRemaining <= 0) {
+		// If we have downloaded enough posts, move on to the next subreddit
+		if (subredditList.length > 1) {
+			return downloadNextSubreddit();
+		} else {
+			// If we have downloaded all the subreddits, end the program
+			return checkIfDone('', true);
+		}
+		return;
+	} else if (postsRemaining > 100) {
+		// If we have more posts to download than the limit of 100, set it to 100
+		postsRemaining = 100;
+	}
+
+	// if lastPostId is undefined, set it to an empty string. Common on first run.
+	if (lastPostId == undefined) {
+		lastPostId = '';
+	}
+	makeDirectories();
+
+	try {
+		if (user == undefined) {
+			if (subredditList.length > 1) {
+				return downloadNextSubreddit();
+			} else {
+				return checkIfDone();
+			}
+		}
+
+		// Use log function to log a string
+		// as well as a boolean if the log should be displayed to the user.
+		let reqUrl = `https://www.reddit.com/user/${user.replace('u/', '')}/.json?limit=${postsRemaining}&after=${lastPostId}`
+		log(
+			`\n\n👀 Requesting posts from
+			${reqUrl}\n`,
+			false
+		);
+
+		// Get the top posts from the subreddit
+		let response = null;
+		let data = null;
+
+		try {
+			response = await axios.get(
+				`${reqUrl}`
+			);
+			
+			data = await response.data;
+			currentUserAfter = data.data.after;
+
+			log(JSON.stringify(data), true);
+			
+			currentAPICall = data;
+			if (data.message == 'Not Found' || data.data.children.length == 0) {
+				throw error;
+			}
+			if (data.data.children.length < postsRemaining) {
+				lastAPICallForSubreddit = true;
+				postsRemaining = data.data.children.length;
+			} else {
+				lastAPICallForSubreddit = false;
+			}
+		} catch (err) {
+
+			log(
+				`\n\nERROR: There was a problem fetching posts for ${user}. This is likely because the subreddit is private, banned, or doesn't exist.`,
+				true
+			);
+			if (subredditList.length > 1) {
+				if (currentSubredditIndex > subredditList.length - 1) {
+					currentSubredditIndex = -1;
+				}
+				currentSubredditIndex += 1;
+				return downloadSubredditPosts(subredditList[currentSubredditIndex], '');
+			} else {
+				return checkIfDone('', true);
+			}
+		}
+
+		downloadDirectory = `./downloads/users/${user.replace('u/', '')}`;
+
+		// Make sure the image directory exists
+		// If no directory is found, create one
+		if (!fs.existsSync(downloadDirectory)) {
+			fs.mkdirSync(downloadDirectory);
+		}
+
+		responseSize = data.data.children.length;
+
+		await data.data.children.forEach(async (child, i) => {
+			try {
+				const post = child.data;
+				if (post.post_hint) {
+					downloadPost(post);
+				}
+
 			} catch (e) {
 				log(e, true);
 			}
@@ -454,7 +596,7 @@ async function downloadPost(post) {
 
 	// All posts should have URLs, so just make sure that it does.
 	// If the post doesn't have a URL, then it should be skipped.
-	if (post.url) {
+	if (post.url && post.post_hint) {
 		// Array of possible (supported) image and video formats
 		const imageFormats = ['jpeg', 'jpg', 'gif', 'png', 'mp4', 'webm', 'gifv'];
 
