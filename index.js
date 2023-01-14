@@ -272,8 +272,8 @@ function makeDirectories() {
 	if (!fs.existsSync('./downloads')) {
 		fs.mkdirSync('./downloads');
 	}
-	if (!fs.existsSync('./downloads/users')) {
-		fs.mkdirSync('./downloads/users');
+	if (!fs.existsSync('./downloads/USERS')) {
+		fs.mkdirSync('./downloads/USERS');
 	}
 	if (config.separate_clean_nsfw) {
 		if (!fs.existsSync('./downloads/clean')) {
@@ -499,7 +499,7 @@ async function downloadUser(user, currentUserAfter) {
 			}
 		}
 
-		downloadDirectory = `./downloads/users/${user.replace('u/', '')}`;
+		downloadDirectory = `./downloads/USERS/${user.replace('u/', '')}`;
 
 		// Make sure the image directory exists
 		// If no directory is found, create one
