@@ -582,7 +582,7 @@ async function downloadMediaFile(downloadURL, filePath, postName) {
 }
 
 async function downloadPost(post) {
-	let postTypeOptions = ['self', 'media', 'link', 'poll']; 
+	let postTypeOptions = ['self', 'media', 'link', 'poll'];
 	let postType = -1; // default to no postType until one is found
 
 	// Determine the type of post. If no type is found, default to link as a last resort.
