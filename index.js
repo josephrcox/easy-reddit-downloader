@@ -90,7 +90,7 @@ console.clear(); // Clear the console
 log(chalk.cyan('Welcome to Reddit Post Downloader! '), false);
 log(
 	chalk.yellow(
-		'Contribute @ https://github.com/josephrcox/easy-reddit-downloader'
+		'Contribute @ https://github.com/josephrcox/easy-reddit-downloader\n'
 	),
 	false
 );
@@ -158,12 +158,12 @@ request.get(
 			// Compare the current version to the latest release version
 			if (version !== latestVersion) {
 				log(
-					`ALERT: A new version (${latestVersion}) is available. \nPlease update to the latest version with 'git pull'.\n`,
+					`Hey! A new version (${latestVersion}) is available. \nPlease update to the latest version with 'git pull'.\n`,
 					false
 				);
 				startScript();
 			} else {
-				log('You are on the latest stable version (' + version + ')\n', false);
+				log('You are on the latest stable version (' + version + ')\n', true);
 				startScript();
 			}
 		}
