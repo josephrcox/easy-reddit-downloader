@@ -856,7 +856,7 @@ function checkIfDone(lastPostId, override) {
 		log('Validating that all posts were downloaded...', false);
 		setTimeout(() => {
 			log(
-				'🎉 All done downloading posts from ' + downloadedPosts.subreddit + '!',
+				'🎉 All done downloading posts from ' + subredditList[currentSubredditIndex] + '!',
 				false
 			);
 			log(JSON.stringify(downloadedPosts), true);
