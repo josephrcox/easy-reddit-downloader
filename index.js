@@ -229,7 +229,7 @@ async function startPrompt() {
 			type: 'toggle',
 			name: 'repeatForever',
 			message: 'Would you like to run this on repeat?',
-			initial: true,
+			initial: false,
 			active: 'yes',
 			inactive: 'no',
 		},
