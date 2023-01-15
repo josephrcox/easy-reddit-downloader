@@ -46,18 +46,6 @@ let downloadedPosts = {
 	skipped_due_to_fileType: 0,
 };
 
-// Repeat intervals in milliseconds if the user choses to repeat forever
-const repeatIntervals = {
-	1: 0,
-	2: 1000 * 30, // 30 seconds
-	3: 1000 * 60, // 1 minute
-	4: 1000 * 60 * 5, // 5 minutes
-	5: 1000 * 60 * 30, // 30 minutes
-	6: 1000 * 60 * 60, // 1 hour
-	7: 1000 * 60 * 60 * 3, // 3 hours
-	8: 1000 * 60 * 60 * 24, // 24 hours
-};
-
 // Read the user_config.json file for user configuration options
 if (fs.existsSync('./user_config.json')) {
 	config = require('./user_config.json');
@@ -87,10 +75,16 @@ if (testingMode) {
 
 // Start actions
 console.clear(); // Clear the console
-log(chalk.cyan('Welcome to Reddit Post Downloader! '), false);
+log(chalk.cyan('👋 Welcome to the easiest & most customizable Reddit Post Downloader!'), false);
 log(
 	chalk.yellow(
-		'Contribute @ https://github.com/josephrcox/easy-reddit-downloader\n'
+		'😎 Contribute @ https://github.com/josephrcox/easy-reddit-downloader'
+	),
+	false
+);
+log(
+	chalk.blue(
+		'🤔 Confused? Check out the README @ https://github.com/josephrcox/easy-reddit-downloader#readme\n'
 	),
 	false
 );
@@ -158,7 +152,7 @@ request.get(
 			// Compare the current version to the latest release version
 			if (version !== latestVersion) {
 				log(
-					`Hey! A new version (${latestVersion}) is available. \nPlease update to the latest version with 'git pull'.\n`,
+					`Hey! A new version (${latestVersion}) is available. \nConsider updating to the latest version with 'git pull'.\n`,
 					false
 				);
 				startScript();
@@ -171,10 +165,17 @@ request.get(
 );
 
 function startScript() {
-	if (!testingMode) {
+	if (
+		!testingMode &&
+		!config.download_post_list_options.enabled
+	) {
 		startPrompt();
 	} else {
-		downloadSubredditPosts(subredditList[0], ''); // skip the prompt and get right to the API calls
+		if (config.download_post_list_options.enabled) {
+			downloadFromPostListFile();
+		} else {
+			downloadSubredditPosts(subredditList[0], ''); // skip the prompt and get right to the API calls
+		}
 	}
 }
 
@@ -520,6 +521,57 @@ async function downloadUser(user, currentUserAfter) {
 	}
 }
 
+async function downloadFromPostListFile() {
+	// this is called when config.download_from_post_list_file is true
+	// this will read the download_post_list.txt file and download all the posts in it
+	// downloading skips any lines starting with "#" as they are used for documentation
+
+	// read the file
+	let file = fs.readFileSync('./download_post_list.txt', 'utf8');
+	// split the file into an array of lines
+	let lines = file.split('\n');
+	// remove any lines that start with "#"
+	lines = lines.filter((line) => !line.startsWith('#'));
+	// remove any empty lines
+	lines = lines.filter((line) => line != '');
+	// remove any lines that are just whitespace
+	lines = lines.filter((line) => line.trim() != '');
+	// remove any lines that don't start with "https://www.reddit.com"
+	lines = lines.filter((line) => line.startsWith('https://www.reddit.com'));
+	// remove any lines that don't have "/comments/" in them
+	lines = lines.filter((line) => line.includes('/comments/'));
+	console.log(lines);
+	numberOfPosts = lines.length;
+
+	repeatForever = config.download_post_list_options.repeatForever;
+	timeBetweenRuns = config.download_post_list_options.timeBetweenRuns;
+
+	// iterate over the lines and download the posts
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i];
+		const reqUrl = line + '.json';
+		axios.get(reqUrl).then(async (response) => {
+			const post = response.data[0].data.children[0].data;
+			let isOver18 = post.over_18 ? 'nsfw' : 'clean';
+			downloadedPosts.subreddit = post.subreddit;
+			makeDirectories();
+
+			if (!config.separate_clean_nsfw) {
+				downloadDirectory = `./downloads/${post.subreddit}`;
+			} else {
+				downloadDirectory = `./downloads/${isOver18}/${post.subreddit}`;
+			}
+
+			// Make sure the image directory exists
+			// If no directory is found, create one
+			if (!fs.existsSync(downloadDirectory)) {
+				fs.mkdirSync(downloadDirectory);
+			}
+			downloadPost(post);
+		});
+	}
+}
+
 function getPostType(post, postTypeOptions) {
 	log(`Analyzing post with title: ${post.title}) and URL: ${post.url}`, true);
 	if (post.post_hint === 'self' || post.is_self) {
@@ -844,21 +896,50 @@ function checkIfDone(lastPostId, override) {
 		override ||
 		(numberOfPostsRemaining()[1] === responseSize && responseSize < 100)
 	) {
-		// All done downloading posts from this subreddit
 		let endTime = new Date();
 		let timeDiff = endTime - startTime;
 		timeDiff /= 1000;
-		// simplify to first 5 digits for msPerPost
 		let msPerPost = (timeDiff / numberOfPostsRemaining()[1])
 			.toString()
 			.substring(0, 5);
-
-		log('Validating that all posts were downloaded...', false);
-		setTimeout(() => {
+		if (numberOfPosts >= 99999999999999999999) {
 			log(
-				'🎉 All done downloading posts from ' + subredditList[currentSubredditIndex] + '!',
+				`Still downloading posts from ${chalk.cyan(
+					subredditList[currentSubredditIndex]
+				)}... (${numberOfPostsRemaining()[1]}/all)`,
 				false
 			);
+		} else if (config.download_post_list_options.enabled) {
+			log(
+				`Still downloading posts from ${chalk.cyan(
+					'download_post_list.txt'
+				)}... (${numberOfPostsRemaining()[1]}/${numberOfPosts})`,
+				false
+			);
+		} else {
+			log(
+				`Still downloading posts from ${chalk.cyan(
+					subredditList[currentSubredditIndex]
+				)}... (${numberOfPostsRemaining()[1]}/${numberOfPosts})`,
+				false
+			);
+		}
+		log('Validating that all posts were downloaded...', false);
+		setTimeout(() => {
+			if (config.download_post_list_options.enabled) {
+				log(
+					'🎉 All done downloading posts from download_post_list.txt!',
+					false
+				);
+			} else {
+				log(
+					'🎉 All done downloading posts from ' +
+						subredditList[currentSubredditIndex] +
+						'!',
+					false
+				);
+			}
+
 			log(JSON.stringify(downloadedPosts), true);
 
 			log(
@@ -887,7 +968,11 @@ function checkIfDone(lastPostId, override) {
 					false
 				);
 				setTimeout(function () {
-					downloadSubredditPosts(subredditList[0], '');
+					if (config.download_post_list_options.enabled) {
+						downloadFromPostListFile();
+					} else {
+						downloadSubredditPosts(subredditList[0], '');
+					}
 				}, timeBetweenRuns);
 			} else {
 				startPrompt();
@@ -900,6 +985,13 @@ function checkIfDone(lastPostId, override) {
 				`Still downloading posts from ${chalk.cyan(
 					subredditList[currentSubredditIndex]
 				)}... (${numberOfPostsRemaining()[1]}/all)`,
+				false
+			);
+		} else if (config.download_post_list_options.enabled) {
+			log(
+				`Still downloading posts from ${chalk.cyan(
+					'download_post_list.txt'
+				)}... (${numberOfPostsRemaining()[1]}/${numberOfPosts})`,
 				false
 			);
 		} else {
