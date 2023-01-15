@@ -3,8 +3,7 @@ const { version } = require('./package.json');
 
 // NodeJS Dependencies
 const fs = require('fs');
-const prompt = require('prompt');
-var colors = require('@colors/colors/safe');
+const prompts = require('prompts');
 const chalk = require('chalk');
 const axios = require('axios');
 
@@ -32,6 +31,8 @@ let sorting = 'top'; // How to sort the posts (top, new, hot, rising, controvers
 let time = 'all'; // What time period to sort by (hour, day, week, month, year, all)
 let repeatForever = false; // If true, the program will repeat every timeBetweenRuns milliseconds
 let downloadDirectory = ''; // Where to download the files to, defined when
+
+let currentUserAfter = ''; // Used to track the after value for the API call, this is used to get the next X posts
 
 // Default object to track the downloaded posts by type,
 // and the subreddit downloading from.
@@ -89,7 +90,7 @@ console.clear(); // Clear the console
 log(chalk.cyan('Welcome to Reddit Post Downloader! '), false);
 log(
 	chalk.yellow(
-		'Contribute @ https://github.com/josephrcox/easy-reddit-downloader'
+		'Contribute @ https://github.com/josephrcox/easy-reddit-downloader\n'
 	),
 	false
 );
@@ -157,12 +158,12 @@ request.get(
 			// Compare the current version to the latest release version
 			if (version !== latestVersion) {
 				log(
-					`ALERT: A new version (${latestVersion}) is available. \nPlease update to the latest version with 'git pull'.\n`,
+					`Hey! A new version (${latestVersion}) is available. \nPlease update to the latest version with 'git pull'.\n`,
 					false
 				);
 				startScript();
 			} else {
-				log('You are on the latest stable version (' + version + ')\n', false);
+				log('You are on the latest stable version (' + version + ')\n', true);
 				startScript();
 			}
 		}
@@ -177,89 +178,94 @@ function startScript() {
 	}
 }
 
-function startPrompt() {
-	prompt.start();
-	prompt.message = ''; // remove the default prompt message
-	prompt.delimiter = ''; // removes the delimter between the prompt and the input ("prompt: ")
+async function startPrompt() {
+	const questions = [
+		{
+			type: 'text',
+			name: 'subreddit',
+			message:
+				'Which subreddits or users would you like to download? You may submit multiple separated by commas (no spaces).',
+			validate: (value) =>
+				value.length < 1 ? `Please enter at least one subreddit or user` : true,
+		},
+		{
+			type: 'number',
+			name: 'numberOfPosts',
+			message:
+				'How many posts would you like to attempt to download? If you would like to download all posts, enter 0.',
+			validate: (value) =>
+				// check if value is a number
+				!isNaN(value) ? true : `Please enter a number`,
+		},
+		{
+			type: 'text',
+			name: 'sorting',
+			message:
+				'How would you like to sort? (top, new, hot, rising, controversial)',
+			validate: (value) =>
+				value.toLowerCase() === 'top' ||
+				value.toLowerCase() === 'new' ||
+				value.toLowerCase() === 'hot' ||
+				value.toLowerCase() === 'rising' ||
+				value.toLowerCase() === 'controversial'
+					? true
+					: `Please enter a valid sorting method`,
+		},
+		{
+			type: 'text',
+			name: 'time',
+			message: 'During what time period? (hour, day, week, month, year, all)',
+			validate: (value) =>
+				value.toLowerCase() === 'hour' ||
+				value.toLowerCase() === 'day' ||
+				value.toLowerCase() === 'week' ||
+				value.toLowerCase() === 'month' ||
+				value.toLowerCase() === 'year' ||
+				value.toLowerCase() === 'all'
+					? true
+					: `Please enter a valid time period`,
+		},
+		{
+			type: 'toggle',
+			name: 'repeatForever',
+			message: 'Would you like to run this on repeat?',
+			initial: false,
+			active: 'yes',
+			inactive: 'no',
+		},
+		{
+			type: (prev) => (prev == true ? 'number' : null),
+			name: 'timeBetweenRuns',
+			message: 'How often would you like to run this? (in ms)',
+		},
+	];
 
-	// On first exec, this will always run.
-	// But if repeatForever is set to true (by the user) then this will
-	// run again after the timeBetweenRuns interval
-	if (!repeatForever) {
-		prompt.get(
-			{
-				properties: {
-					subreddit: {
-						description: colors.magenta(
-							'What subreddit would you like to download?' +
-								' You may submit multiple separated by commas (no spaces).\n\t'
-						),
-					},
-					post_count: {
-						description: colors.blue(
-							'How many posts do you want to go through?' +
-								'(more posts = more downloads, but takes longer)\n\t'
-						),
-					},
-					sorting: {
-						description: colors.yellow(
-							'How would you like to sort? (top, new, hot, rising, controversial)\n\t'
-						),
-					},
-					time: {
-						description: colors.green(
-							'What time period? (hour, day, week, month, year, all)\n\t'
-						),
-					},
-					repeat: {
-						description: colors.red(
-							'How often should this be run? \nManually enter number other than the options below for manual entry, i.e. "500" for every 0.5 second \n' +
-								'1.) one time\n' +
-								'2.) every 0.5 minute\n' +
-								'3.) every minute\n' +
-								'4.) every 5 minutes\n' +
-								'5.) every 30 minutes\n' +
-								'6.) every hour\n' +
-								'7.) every 3 hours\n' +
-								'8.) every day\n\t'
-						),
-					},
-				},
-			},
-			function (err, result) {
-				if (err) {
-					return onErr(err);
-				}
-				subredditList = result.subreddit.split(','); // the user enters subreddits separated by commas
-				// clean up the subreddit list in case the user puts in invalid chars
-				for (let i = 0; i < subredditList.length; i++) {
-					subredditList[i] = subredditList[i].replace(/\s/g, '');
-				}
-				numberOfPosts = result.post_count;
-				if (numberOfPosts.toLowerCase() === 'all') {
-					numberOfPosts = 9999999999999999999999;
-				}
-				sorting = result.sorting.replace(/\s/g, '');
-				time = result.time.replace(/\s/g, '');
-				repeatForever = true;
-				if (result.repeat == 1) {
-					repeatForever = false;
-				}
-				if (result.repeat < 1 || result.repeat > 8) {
-					if (result.repeat < 0) {
-						result.repeat = 0;
-					}
-					timeBetweenRuns = result.repeat;
-				} else {
-					timeBetweenRuns = repeatIntervals[result.repeat] || 0;
-				}
+	const result = await prompts(questions);
+	subredditList = result.subreddit.split(','); // the user enters subreddits separated by commas
+	repeatForever = result.repeatForever;
+	numberOfPosts = result.numberOfPosts;
+	sorting = result.sorting.replace(/\s/g, '');
+	time = result.time.replace(/\s/g, '');
 
-				// With the data gathered, call the APIs and download the posts
-				startTime = new Date();
-				downloadSubredditPosts(subredditList[0], '');
-			}
-		);
+	// clean up the subreddit list in case the user puts in invalid chars
+	for (let i = 0; i < subredditList.length; i++) {
+		subredditList[i] = subredditList[i].replace(/\s/g, '');
 	}
+
+	if (numberOfPosts === 0) {
+		numberOfPosts = 9999999999999999999999;
+	}
+
+	if (repeatForever) {
+		if (result.repeat < 0) {
+			result.repeat = 0;
+		}
+		timeBetweenRuns = result.timeBetweenRuns; // the user enters the time between runs in ms
+	}
+
+	// With the data gathered, call the APIs and download the posts
+	startTime = new Date();
+	downloadSubredditPosts(subredditList[0], '');
 }
 
 function makeDirectories() {
@@ -279,6 +285,16 @@ function makeDirectories() {
 }
 
 async function downloadSubredditPosts(subreddit, lastPostId) {
+	let isUser = false;
+	if (
+		subreddit.includes('u/') ||
+		subreddit.includes('user/') ||
+		subreddit.includes('/u/')
+	) {
+		isUser = true;
+		subreddit = subreddit.split('u/').pop();
+		return downloadUser(subreddit, lastPostId);
+	}
 	let postsRemaining = numberOfPostsRemaining()[0];
 	if (postsRemaining <= 0) {
 		// If we have downloaded enough posts, move on to the next subreddit
@@ -311,11 +327,23 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 
 		// Use log function to log a string
 		// as well as a boolean if the log should be displayed to the user.
-		log(
-			`\n\n👀 Requesting posts from
-		https://www.reddit.com/r/${subreddit}/${sorting}/.json?sort=${sorting}&t=${time}&limit=${postsRemaining}&after=${lastPostId}\n`,
-			true
-		);
+		if (isUser) {
+			log(
+				`\n\n👀 Requesting posts from
+				https://www.reddit.com/user/${subreddit.replace(
+					'u/',
+					''
+				)}/${sorting}/.json?sort=${sorting}&t=${time}&limit=${postsRemaining}&after=${lastPostId}\n`,
+				true
+			);
+		} else {
+			log(
+				`\n\n👀 Requesting posts from
+			https://www.reddit.com/r/${subreddit}/${sorting}/.json?sort=${sorting}&t=${time}&limit=${postsRemaining}&after=${lastPostId}\n`,
+				true
+			);
+		}
+
 		// Get the top posts from the subreddit
 		let response = null;
 		let data = null;
@@ -324,7 +352,11 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 			response = await axios.get(
 				`https://www.reddit.com/r/${subreddit}/${sorting}/.json?sort=${sorting}&t=${time}&limit=${postsRemaining}&after=${lastPostId}`
 			);
+
 			data = await response.data;
+
+			log(JSON.stringify(data.data.children.length), false);
+
 			currentAPICall = data;
 			if (data.message == 'Not Found' || data.data.children.length == 0) {
 				throw error;
@@ -384,6 +416,110 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 	}
 }
 
+async function downloadUser(user, currentUserAfter) {
+	let lastPostId = currentUserAfter;
+	let postsRemaining = numberOfPostsRemaining()[0];
+	if (postsRemaining <= 0) {
+		// If we have downloaded enough posts, move on to the next subreddit
+		if (subredditList.length > 1) {
+			return downloadNextSubreddit();
+		} else {
+			// If we have downloaded all the subreddits, end the program
+			return checkIfDone('', true);
+		}
+		return;
+	} else if (postsRemaining > 100) {
+		// If we have more posts to download than the limit of 100, set it to 100
+		postsRemaining = 100;
+	}
+
+	// if lastPostId is undefined, set it to an empty string. Common on first run.
+	if (lastPostId == undefined) {
+		lastPostId = '';
+	}
+	makeDirectories();
+
+	try {
+		if (user == undefined) {
+			if (subredditList.length > 1) {
+				return downloadNextSubreddit();
+			} else {
+				return checkIfDone();
+			}
+		}
+
+		// Use log function to log a string
+		// as well as a boolean if the log should be displayed to the user.
+		let reqUrl = `https://www.reddit.com/user/${user.replace(
+			'u/',
+			''
+		)}/submitted/.json?limit=${postsRemaining}&after=${lastPostId}`;
+		log(
+			`\n\n👀 Requesting posts from
+			${reqUrl}\n`,
+			false
+		);
+
+		// Get the top posts from the subreddit
+		let response = null;
+		let data = null;
+
+		try {
+			response = await axios.get(`${reqUrl}`);
+
+			data = await response.data;
+			currentUserAfter = data.data.after;
+
+			currentAPICall = data;
+			if (data.message == 'Not Found' || data.data.children.length == 0) {
+				throw error;
+			}
+			if (data.data.children.length < postsRemaining) {
+				lastAPICallForSubreddit = true;
+				postsRemaining = data.data.children.length;
+			} else {
+				lastAPICallForSubreddit = false;
+			}
+		} catch (err) {
+			log(
+				`\n\nERROR: There was a problem fetching posts for ${user}. This is likely because the subreddit is private, banned, or doesn't exist.`,
+				true
+			);
+			if (subredditList.length > 1) {
+				if (currentSubredditIndex > subredditList.length - 1) {
+					currentSubredditIndex = -1;
+				}
+				currentSubredditIndex += 1;
+				return downloadSubredditPosts(subredditList[currentSubredditIndex], '');
+			} else {
+				return checkIfDone('', true);
+			}
+		}
+
+		downloadDirectory = `./downloads/user_${user.replace('u/', '')}`;
+
+		// Make sure the image directory exists
+		// If no directory is found, create one
+		if (!fs.existsSync(downloadDirectory)) {
+			fs.mkdirSync(downloadDirectory);
+		}
+
+		responseSize = data.data.children.length;
+
+		await data.data.children.forEach(async (child, i) => {
+			try {
+				const post = child.data;
+				downloadPost(post);
+			} catch (e) {
+				log(e, true);
+			}
+		});
+	} catch (error) {
+		// throw the error
+		throw error;
+	}
+}
+
 function getPostType(post, postTypeOptions) {
 	log(`Analyzing post with title: ${post.title}) and URL: ${post.url}`, true);
 	if (post.post_hint === 'self' || post.is_self) {
@@ -398,6 +534,8 @@ function getPostType(post, postTypeOptions) {
 		post.domain.includes('i.redd.it')
 	) {
 		postType = 1;
+	} else if (post.poll_data != undefined) {
+		postType = 3; // UNSUPPORTED
 	} else {
 		postType = 2;
 	}
@@ -444,7 +582,7 @@ async function downloadMediaFile(downloadURL, filePath, postName) {
 }
 
 async function downloadPost(post) {
-	let postTypeOptions = ['self', 'media', 'link']; // 0 = self, 1 = media, 2 = link
+	let postTypeOptions = ['self', 'media', 'link', 'poll'];
 	let postType = -1; // default to no postType until one is found
 
 	// Determine the type of post. If no type is found, default to link as a last resort.
@@ -454,7 +592,7 @@ async function downloadPost(post) {
 
 	// All posts should have URLs, so just make sure that it does.
 	// If the post doesn't have a URL, then it should be skipped.
-	if (post.url) {
+	if (postType != 3 && post.url !== undefined) {
 		// Array of possible (supported) image and video formats
 		const imageFormats = ['jpeg', 'jpg', 'gif', 'png', 'mp4', 'webm', 'gifv'];
 
@@ -644,10 +782,11 @@ async function downloadPost(post) {
 			}
 		}
 	} else {
-		log(
-			`FAILURE: No URL found for post with title: ${post.title} from subreddit ${post.subreddit}`,
-			true
-		);
+		log('Failed to download: ' + post.title + 'with URL: ' + post.url, true);
+		downloadedPosts.failed += 1;
+		if (checkIfDone(post.name)) {
+			return;
+		}
 	}
 }
 
@@ -717,7 +856,7 @@ function checkIfDone(lastPostId, override) {
 		log('Validating that all posts were downloaded...', false);
 		setTimeout(() => {
 			log(
-				'🎉 All done downloading posts from ' + downloadedPosts.subreddit + '!',
+				'🎉 All done downloading posts from ' + subredditList[currentSubredditIndex] + '!',
 				false
 			);
 			log(JSON.stringify(downloadedPosts), true);
@@ -890,5 +1029,7 @@ function log(message, detailed) {
 
 // sanitize function for file names so that they work on Mac, Windows, and Linux
 function sanitizeFileName(fileName) {
-	return fileName.replace(/[/\\?%*:|"<>]/g, '-').replace(/([^/])\/([^/])/g, "$1_$2");
+	return fileName
+		.replace(/[/\\?%*:|"<>]/g, '-')
+		.replace(/([^/])\/([^/])/g, '$1_$2');
 }
