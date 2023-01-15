@@ -4,7 +4,6 @@ const { version } = require('./package.json');
 // NodeJS Dependencies
 const fs = require('fs');
 const prompts = require('prompts');
-var colors = require('@colors/colors/safe');
 const chalk = require('chalk');
 const axios = require('axios');
 
@@ -251,7 +250,6 @@ async function startPrompt() {
 	for (let i = 0; i < subredditList.length; i++) {
 		subredditList[i] = subredditList[i].replace(/\s/g, '');
 	}
-	console.log(subredditList)
 
 	if (numberOfPosts === 0) {
 		numberOfPosts = 9999999999999999999999;
@@ -290,10 +288,9 @@ function makeDirectories() {
 
 async function downloadSubredditPosts(subreddit, lastPostId) {
 	let isUser = false;
-	if (subreddit.includes('u/' || 'user/' || 'users/' || 'u_' || '/u/')) {
+	if (subreddit.includes('u/') || subreddit.includes('user/') || subreddit.includes('/u/')) {
 		isUser = true;
 		subreddit = subreddit.split('u/').pop();
-		console.log(subreddit)
 		downloadUser(subreddit, lastPostId);
 	}
 	let postsRemaining = numberOfPostsRemaining()[0];
@@ -472,8 +469,6 @@ async function downloadUser(user, currentUserAfter) {
 			
 			data = await response.data;
 			currentUserAfter = data.data.after;
-
-			log(JSON.stringify(data), true);
 			
 			currentAPICall = data;
 			if (data.message == 'Not Found' || data.data.children.length == 0) {
