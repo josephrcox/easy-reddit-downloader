@@ -191,7 +191,8 @@ async function startPrompt() {
 		{
 			type: 'number',
 			name: 'numberOfPosts',
-			message: 'How many posts would you like to attempt to download? If you would like to download all posts, enter 0.',
+			message:
+				'How many posts would you like to attempt to download? If you would like to download all posts, enter 0.',
 			validate: (value) =>
 				// check if value is a number
 				!isNaN(value) ? true : `Please enter a number`,
@@ -241,7 +242,7 @@ async function startPrompt() {
 
 	const result = await prompts(questions);
 	subredditList = result.subreddit.split(','); // the user enters subreddits separated by commas
-	repeatForever = result.repeatForever
+	repeatForever = result.repeatForever;
 	numberOfPosts = result.numberOfPosts;
 	sorting = result.sorting.replace(/\s/g, '');
 	time = result.time.replace(/\s/g, '');
@@ -260,7 +261,7 @@ async function startPrompt() {
 			result.repeat = 0;
 		}
 		timeBetweenRuns = result.timeBetweenRuns; // the user enters the time between runs in ms
-	} 
+	}
 
 	// With the data gathered, call the APIs and download the posts
 	startTime = new Date();
@@ -272,9 +273,6 @@ function makeDirectories() {
 	// clean and nsfw are made nomatter the subreddits downloaded
 	if (!fs.existsSync('./downloads')) {
 		fs.mkdirSync('./downloads');
-	}
-	if (!fs.existsSync('./downloads/USERS')) {
-		fs.mkdirSync('./downloads/USERS');
 	}
 	if (config.separate_clean_nsfw) {
 		if (!fs.existsSync('./downloads/clean')) {
@@ -288,10 +286,14 @@ function makeDirectories() {
 
 async function downloadSubredditPosts(subreddit, lastPostId) {
 	let isUser = false;
-	if (subreddit.includes('u/') || subreddit.includes('user/') || subreddit.includes('/u/')) {
+	if (
+		subreddit.includes('u/') ||
+		subreddit.includes('user/') ||
+		subreddit.includes('/u/')
+	) {
 		isUser = true;
 		subreddit = subreddit.split('u/').pop();
-		downloadUser(subreddit, lastPostId);
+		return downloadUser(subreddit, lastPostId);
 	}
 	let postsRemaining = numberOfPostsRemaining()[0];
 	if (postsRemaining <= 0) {
@@ -328,7 +330,10 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 		if (isUser) {
 			log(
 				`\n\n👀 Requesting posts from
-				https://www.reddit.com/user/${subreddit.replace('u/', '')}/${sorting}/.json?sort=${sorting}&t=${time}&limit=${postsRemaining}&after=${lastPostId}\n`,
+				https://www.reddit.com/user/${subreddit.replace(
+					'u/',
+					''
+				)}/${sorting}/.json?sort=${sorting}&t=${time}&limit=${postsRemaining}&after=${lastPostId}\n`,
 				true
 			);
 		} else {
@@ -344,20 +349,14 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 		let data = null;
 
 		try {
-			if (isUser) {
-				response = await axios.get(
-					`https://www.reddit.com/user/${subreddit.replace('u/', '')}/${sorting}/.json?sort=${sorting}&t=${time}&limit=${postsRemaining}&after=${lastPostId}`
-				);
-			} else {
-				response = await axios.get(
-					`https://www.reddit.com/r/${subreddit}/.json`
-				);
-			}
+			response = await axios.get(
+				`https://www.reddit.com/r/${subreddit}/${sorting}/.json?sort=${sorting}&t=${time}&limit=${postsRemaining}&after=${lastPostId}`
+			);
 
 			data = await response.data;
 
-			log(JSON.stringify(data), true);
-			
+			log(JSON.stringify(data.data.children.length), false);
+
 			currentAPICall = data;
 			if (data.message == 'Not Found' || data.data.children.length == 0) {
 				throw error;
@@ -451,7 +450,10 @@ async function downloadUser(user, currentUserAfter) {
 
 		// Use log function to log a string
 		// as well as a boolean if the log should be displayed to the user.
-		let reqUrl = `https://www.reddit.com/user/${user.replace('u/', '')}/.json?limit=${postsRemaining}&after=${lastPostId}`
+		let reqUrl = `https://www.reddit.com/user/${user.replace(
+			'u/',
+			''
+		)}/submitted/.json?limit=${postsRemaining}&after=${lastPostId}`;
 		log(
 			`\n\n👀 Requesting posts from
 			${reqUrl}\n`,
@@ -463,13 +465,11 @@ async function downloadUser(user, currentUserAfter) {
 		let data = null;
 
 		try {
-			response = await axios.get(
-				`${reqUrl}`
-			);
-			
+			response = await axios.get(`${reqUrl}`);
+
 			data = await response.data;
 			currentUserAfter = data.data.after;
-			
+
 			currentAPICall = data;
 			if (data.message == 'Not Found' || data.data.children.length == 0) {
 				throw error;
@@ -481,7 +481,6 @@ async function downloadUser(user, currentUserAfter) {
 				lastAPICallForSubreddit = false;
 			}
 		} catch (err) {
-
 			log(
 				`\n\nERROR: There was a problem fetching posts for ${user}. This is likely because the subreddit is private, banned, or doesn't exist.`,
 				true
@@ -497,7 +496,7 @@ async function downloadUser(user, currentUserAfter) {
 			}
 		}
 
-		downloadDirectory = `./downloads/USERS/${user.replace('u/', '')}`;
+		downloadDirectory = `./downloads/user_${user.replace('u/', '')}`;
 
 		// Make sure the image directory exists
 		// If no directory is found, create one
@@ -510,10 +509,7 @@ async function downloadUser(user, currentUserAfter) {
 		await data.data.children.forEach(async (child, i) => {
 			try {
 				const post = child.data;
-				if (post.post_hint) {
-					downloadPost(post);
-				}
-
+				downloadPost(post);
 			} catch (e) {
 				log(e, true);
 			}
@@ -538,6 +534,8 @@ function getPostType(post, postTypeOptions) {
 		post.domain.includes('i.redd.it')
 	) {
 		postType = 1;
+	} else if (post.poll_data != undefined) {
+		postType = 3; // UNSUPPORTED
 	} else {
 		postType = 2;
 	}
@@ -584,7 +582,7 @@ async function downloadMediaFile(downloadURL, filePath, postName) {
 }
 
 async function downloadPost(post) {
-	let postTypeOptions = ['self', 'media', 'link']; // 0 = self, 1 = media, 2 = link
+	let postTypeOptions = ['self', 'media', 'link', 'poll']; 
 	let postType = -1; // default to no postType until one is found
 
 	// Determine the type of post. If no type is found, default to link as a last resort.
@@ -594,7 +592,7 @@ async function downloadPost(post) {
 
 	// All posts should have URLs, so just make sure that it does.
 	// If the post doesn't have a URL, then it should be skipped.
-	if (post.url && post.post_hint) {
+	if (postType != 3 && post.url !== undefined) {
 		// Array of possible (supported) image and video formats
 		const imageFormats = ['jpeg', 'jpg', 'gif', 'png', 'mp4', 'webm', 'gifv'];
 
@@ -784,10 +782,11 @@ async function downloadPost(post) {
 			}
 		}
 	} else {
-		log(
-			`FAILURE: No URL found for post with title: ${post.title} from subreddit ${post.subreddit}`,
-			true
-		);
+		log('Failed to download: ' + post.title + 'with URL: ' + post.url, true);
+		downloadedPosts.failed += 1;
+		if (checkIfDone(post.name)) {
+			return;
+		}
 	}
 }
 
