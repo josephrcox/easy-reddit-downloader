@@ -7,13 +7,12 @@
 1. Downloading of all post types from any public subreddit that you would like.
 2. No OAuth or login required! 🔓
 3. **SUPER FAST** 🏃 with an average speed of 20 posts/second. (your mileage may vary)
-4. View top comments and nested comments in text/self posts, all stored locally on your computer.
+4. Downloading of user accounts 🙋‍♂️
 5. Ability to run the script indefinitely at your set interval (run daily, hourly, or even every 30 seconds) - Great for catching new posts before they are removed. 
 6. Automatic HTML file creation for link posts. 🔗
 7. Very few Node dependencies so it's fast to clone and run.
-8. Local logging so you can see what you downloaded in the past and the developer logs.
-9. Null & undefined checking for all post types to prevent errors. 🧠
-10. Customizable file naming and file structure. 📁
+8. Customizable file naming and file structure. 📁
+9. View top comments and nested comments in text/self posts, all stored locally on your computer.
 
 ## Setup & Usage
 1. Clone or download this repo
@@ -81,6 +80,19 @@ For example, if there was a post that went to `https://www.google.com/` then the
 	</body>
 </html>
 ```
+
+## Downloading users
+With the release of v0.2.0, I added the ability to download posts from a specific user. 
+
+To download a user, enter the username in this format when asked what subreddits you would like to download:
+`u/elonmusk`. So, for example if you would like to download a few subs and also a couple of users, this is what it could look like:
+```
+Welcome to Reddit Post Downloader! 
+Contribute @ https://github.com/josephrcox/easy-reddit-downloader
+
+✔ Which subreddits or users would you like to download? You may submit multiple separated by commas (no spaces). … u/elonmusk,pics,u/spez
+```
+Note: at this time, comments from a specific user are not supported. If you would like this, please submit an issue with the `enhancement` tag. 
 
 ## FAQ
 ### Is there any authentication needed? Do I need to login? Do they know that I am downloading all of these posts?
