@@ -60,6 +60,21 @@ if (fs.existsSync('./user_config.json')) {
 	checkConfig();
 }
 
+// check if download_post_list.txt exists, if it doesn't, create it
+if (!fs.existsSync('./download_post_list.txt')) {
+	fs.writeFile('./download_post_list.txt', '', (err) => {
+		if (err) throw err;
+
+		let fileDefaultContent = `# Below, please list any posts that you wish to download. # \n# They must follow this format below: # \n# https://www.reddit.com/r/gadgets/comments/ptt967/eu_proposes_mandatory_usbc_on_all_devices/ # \n# Lines with "#" at the start will be ignored (treated as comments). #`;
+
+		// write a few lines to the file
+		fs.appendFile('./download_post_list.txt', fileDefaultContent, (err) => {
+			if (err) throw err;
+			log('download_post_list.txt was created with default content.', true);
+		});
+	});
+}
+
 // Testing Mode for developer testing. This enables you to hardcode
 // the variables above and skip the prompt.
 // To edit, go into the user_config.json file.
@@ -75,7 +90,12 @@ if (testingMode) {
 
 // Start actions
 console.clear(); // Clear the console
-log(chalk.cyan('👋 Welcome to the easiest & most customizable Reddit Post Downloader!'), false);
+log(
+	chalk.cyan(
+		'👋 Welcome to the easiest & most customizable Reddit Post Downloader!'
+	),
+	false
+);
 log(
 	chalk.yellow(
 		'😎 Contribute @ https://github.com/josephrcox/easy-reddit-downloader'
@@ -165,10 +185,8 @@ request.get(
 );
 
 function startScript() {
-	if (
-		!testingMode &&
-		!config.download_post_list_options.enabled
-	) {
+	startTime = new Date();
+	if (!testingMode && !config.download_post_list_options.enabled) {
 		startPrompt();
 	} else {
 		if (config.download_post_list_options.enabled) {
@@ -265,7 +283,6 @@ async function startPrompt() {
 	}
 
 	// With the data gathered, call the APIs and download the posts
-	startTime = new Date();
 	downloadSubredditPosts(subredditList[0], '');
 }
 
@@ -355,8 +372,6 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 			);
 
 			data = await response.data;
-
-			log(JSON.stringify(data.data.children.length), false);
 
 			currentAPICall = data;
 			if (data.message == 'Not Found' || data.data.children.length == 0) {
@@ -540,7 +555,6 @@ async function downloadFromPostListFile() {
 	lines = lines.filter((line) => line.startsWith('https://www.reddit.com'));
 	// remove any lines that don't have "/comments/" in them
 	lines = lines.filter((line) => line.includes('/comments/'));
-	console.log(lines);
 	numberOfPosts = lines.length;
 
 	repeatForever = config.download_post_list_options.repeatForever;
@@ -941,11 +955,12 @@ function checkIfDone(lastPostId, override) {
 			}
 
 			log(JSON.stringify(downloadedPosts), true);
-
-			log(
-				`\n📈 Downloading took ${timeDiff} seconds, at about ${msPerPost} seconds/post`,
-				true
-			);
+			if (currentSubredditIndex === subredditList.length - 1) {
+				log(
+					`\n📈 Downloading took ${timeDiff} seconds, at about ${msPerPost} seconds/post`,
+					false
+				);
+			}
 
 			// default values for next run (important if being run multiple times)
 			downloadedPosts = {
@@ -957,7 +972,6 @@ function checkIfDone(lastPostId, override) {
 				skipped_due_to_duplicate: 0,
 				skipped_due_to_fileType: 0,
 			};
-			startTime = null;
 
 			if (currentSubredditIndex < subredditList.length - 1) {
 				downloadNextSubreddit();
@@ -973,12 +987,13 @@ function checkIfDone(lastPostId, override) {
 					} else {
 						downloadSubredditPosts(subredditList[0], '');
 					}
+					startTime = new Date();
 				}, timeBetweenRuns);
 			} else {
 				startPrompt();
 			}
 			return true;
-		}, 3000);
+		}, 1000);
 	} else {
 		if (numberOfPosts >= 99999999999999999999) {
 			log(
