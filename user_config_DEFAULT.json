@@ -8,6 +8,11 @@
         "repeatForever": true,
         "timeBetweenRuns": 30000
     },
+    "download_post_list_options": {
+        "enabled": false,
+        "repeatForever": false,
+        "timeBetweenRuns": 3000
+    },
     "local_logs": true,
     "local_logs_naming_scheme": {
         "showDateAndTime": true,

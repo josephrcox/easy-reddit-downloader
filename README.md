@@ -94,6 +94,16 @@ Contribute @ https://github.com/josephrcox/easy-reddit-downloader
 ```
 Note: at this time, comments from a specific user are not supported. If you would like this, please submit an issue with the `enhancement` tag. 
 
+## Downloading from a post list (download specific URLs)
+With version v0.2.1, I added the ability to download specific posts from a list of URLs.
+
+To download a list of posts:
+1. Enter your post list in `download_post_list.txt` in the root directory of the project. Make sure to follow the format as shown in the first few comment lines of the file. 
+2. Go into `user_config.json` and set `download_post_list_options` > `enabled: true`.
+3. Run the application as normal.
+
+You may also choose to download these specific posts at a set interval using the `repeatForever` boolean and `timeBetweenRuns` integer in the `download_post_list_options` object in `user_config.json`. Make sure to enter the timeBetweenRuns in milliseconds. 
+
 ## FAQ
 ### Is there any authentication needed? Do I need to login? Do they know that I am downloading all of these posts?
 No. This uses the public Reddit API provided by adding `.json` to regular Reddit pages. 
