@@ -560,6 +560,27 @@ async function downloadFromPostListFile() {
 	repeatForever = config.download_post_list_options.repeatForever;
 	timeBetweenRuns = config.download_post_list_options.timeBetweenRuns;
 
+	if (numberOfPosts === 0) {
+		log(
+			chalk.red(
+				'ERROR: There are no posts in the download_post_list.txt file. Please add some posts to the file and try again.\n'
+			),
+			false
+		);
+		log(
+			chalk.yellow(
+				'If you are trying to download posts from a subreddit, please set "download_post_list_options.enabled" to false in the user_config.json file.\n'
+			),
+			false
+		);
+		process.exit(1);
+	}
+
+	log(
+		chalk.green(
+			`Starting download of ${numberOfPosts} posts from the download_post_list.txt file.\n`
+		)
+	);
 	// iterate over the lines and download the posts
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i];
@@ -939,9 +960,9 @@ function checkIfDone(lastPostId, override) {
 		(lastAPICallForSubreddit &&
 			lastPostId ===
 				currentAPICall.data.children[responseSize - 1].data.name) ||
-			numberOfPostsRemaining()[0] === 0 ||
-			override ||
-			(numberOfPostsRemaining()[1] === responseSize && responseSize < 100)
+		numberOfPostsRemaining()[0] === 0 ||
+		override ||
+		(numberOfPostsRemaining()[1] === responseSize && responseSize < 100)
 	) {
 		let endTime = new Date();
 		let timeDiff = endTime - startTime;
@@ -956,13 +977,6 @@ function checkIfDone(lastPostId, override) {
 				)}... (${numberOfPostsRemaining()[1]}/all)`,
 				false
 			);
-		} else if (config.download_post_list_options.enabled) {
-			log(
-				`Still downloading posts from ${chalk.cyan(
-					'download_post_list.txt'
-				)}... (${numberOfPostsRemaining()[1]}/${numberOfPosts})`,
-				false
-			);
 		} else {
 			log(
 				`Still downloading posts from ${chalk.cyan(
@@ -974,19 +988,12 @@ function checkIfDone(lastPostId, override) {
 		if (numberOfPostsRemaining()[0] === 0) {
 			log('Validating that all posts were downloaded...', false);
 			setTimeout(() => {
-				if (config.download_post_list_options.enabled) {
-					log(
-						'🎉 All done downloading posts from download_post_list.txt!',
-						false
-					);
-				} else {
-					log(
-						'🎉 All done downloading posts from ' +
-							subredditList[currentSubredditIndex] +
-							'!',
-						false
-					);
-				}
+				log(
+					'🎉 All done downloading posts from ' +
+						subredditList[currentSubredditIndex] +
+						'!',
+					false
+				);
 
 				log(JSON.stringify(downloadedPosts), true);
 				if (currentSubredditIndex === subredditList.length - 1) {
@@ -1016,11 +1023,7 @@ function checkIfDone(lastPostId, override) {
 						false
 					);
 					setTimeout(function () {
-						if (config.download_post_list_options.enabled) {
-							downloadFromPostListFile();
-						} else {
-							downloadSubredditPosts(subredditList[0], '');
-						}
+						downloadSubredditPosts(subredditList[0], '');
 						startTime = new Date();
 					}, timeBetweenRuns);
 				} else {
@@ -1035,13 +1038,6 @@ function checkIfDone(lastPostId, override) {
 				`Still downloading posts from ${chalk.cyan(
 					subredditList[currentSubredditIndex]
 				)}... (${numberOfPostsRemaining()[1]}/all)`,
-				false
-			);
-		} else if (config.download_post_list_options.enabled) {
-			log(
-				`Still downloading posts from ${chalk.cyan(
-					'download_post_list.txt'
-				)}... (${numberOfPostsRemaining()[1]}/${numberOfPosts})`,
 				false
 			);
 		} else {
