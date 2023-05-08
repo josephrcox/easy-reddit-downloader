@@ -31,6 +31,7 @@ let sorting = 'top'; // How to sort the posts (top, new, hot, rising, controvers
 let time = 'all'; // What time period to sort by (hour, day, week, month, year, all)
 let repeatForever = false; // If true, the program will repeat every timeBetweenRuns milliseconds
 let downloadDirectory = ''; // Where to download the files to, defined when
+let useYTDLforVideo = '' // Experiment on using YoutubeDL for videos, quick fix for issue #65
 
 let currentUserAfter = ''; // Used to track the after value for the API call, this is used to get the next X posts
 
@@ -85,7 +86,7 @@ if (testingMode) {
 	sorting = config.testingModeOptions.sorting;
 	time = config.testingModeOptions.time;
 	repeatForever = config.testingModeOptions.repeatForever;
-	timeBetweenRuns = config.testingModeOptions.timeBetweenRuns;
+	timeBetweenRuns = config.testingModeOptions.timeBetweenRuns; 
 }
 
 // Start actions
@@ -560,27 +561,6 @@ async function downloadFromPostListFile() {
 	repeatForever = config.download_post_list_options.repeatForever;
 	timeBetweenRuns = config.download_post_list_options.timeBetweenRuns;
 
-	if (numberOfPosts === 0) {
-		log(
-			chalk.red(
-				'ERROR: There are no posts in the download_post_list.txt file. Please add some posts to the file and try again.\n'
-			),
-			false
-		);
-		log(
-			chalk.yellow(
-				'If you are trying to download posts from a subreddit, please set "download_post_list_options.enabled" to false in the user_config.json file.\n'
-			),
-			false
-		);
-		process.exit(1);
-	}
-
-	log(
-		chalk.green(
-			`Starting download of ${numberOfPosts} posts from the download_post_list.txt file.\n`
-		)
-	);
 	// iterate over the lines and download the posts
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i];
@@ -793,8 +773,25 @@ async function downloadPost(post) {
 				// We need to get the URL from the media object.
 				// This is because the URL in the post object is a fallback URL.
 				// The media object has the actual URL.
-				downloadURL = post.media.reddit_video.fallback_url;
-				fileType = 'mp4';
+				if (useYTDLforVideo != true) {
+					const posttitle = post.name;
+
+					const YoutubeDlWrap = require("youtube-dl-wrap");
+					const youtubeDlWrap = new YoutubeDlWrap("/home/noexplorer/Downloads/youtube-dl");
+
+					let youtubeDlEventEmitter = youtubeDlWrap.exec([post.url,
+						"-o MEDIA-%(id)s"])
+  					// .on("progress", (progress) => 
+    				// console.log(progress.percent, progress.totalSize, progress.currentSpeed, progress.eta))
+  					// .on("youtubeDlEvent", (eventType, eventData) => console.log(eventType, eventData))
+  					.on("error", (error) => console.error(error))
+  					.on("close", () => console.log("Done downloading video post with link", post.url ))
+					console.log(youtubeDlEventEmitter.youtubeDlProcess.pid);
+				}
+				else {
+					downloadURL = post.media.reddit_video.fallback_url;
+					fileType = 'mp4';					
+				}
 			} else if (
 				post.media != undefined &&
 				post.post_hint == 'rich:video' &&
@@ -921,42 +918,9 @@ function onErr(err) {
 // and this ensures that we only check after the files are done being downloaded to the PC, not
 // just when the request is sent.
 function checkIfDone(lastPostId, override) {
-	// If we are downloading from a post list, simply ignore this function.
-	if (config.download_post_list_options.enabled) {
-		if (numberOfPostsRemaining()[0] > 0) {
-			// Still downloading from post list
-			log(
-				`Still downloading posts from ${chalk.cyan(
-					subredditList[currentSubredditIndex]
-				)}... (${numberOfPostsRemaining()[1]}/all)`,
-				false
-			);
-		} else {
-			// Done downloading from post list
-			log(`Finished downloading posts from download_post_list.txt`, false);
-			downloadedPosts = {
-				subreddit: '',
-				self: 0,
-				media: 0,
-				link: 0,
-				failed: 0,
-				skipped_due_to_duplicate: 0,
-				skipped_due_to_fileType: 0,
-			};
-			if (config.download_post_list_options.repeatForever) {
-				log(
-					`⏲️ Waiting ${
-						config.download_post_list_options.timeBetweenRuns / 1000
-					} seconds before rerunning...`,
-					false
-				);
-				setTimeout(function () {
-					downloadFromPostListFile();
-					startTime = new Date();
-				}, timeBetweenRuns);
-			}
-		}
-	} else if (
+	// Add up all downloaded/failed posts that have been downloaded so far, and check if it matches the
+	// number requested.
+	if (
 		(lastAPICallForSubreddit &&
 			lastPostId ===
 				currentAPICall.data.children[responseSize - 1].data.name) ||
@@ -977,6 +941,13 @@ function checkIfDone(lastPostId, override) {
 				)}... (${numberOfPostsRemaining()[1]}/all)`,
 				false
 			);
+		} else if (config.download_post_list_options.enabled) {
+			log(
+				`Still downloading posts from ${chalk.cyan(
+					'download_post_list.txt'
+				)}... (${numberOfPostsRemaining()[1]}/${numberOfPosts})`,
+				false
+			);
 		} else {
 			log(
 				`Still downloading posts from ${chalk.cyan(
@@ -985,59 +956,75 @@ function checkIfDone(lastPostId, override) {
 				false
 			);
 		}
-		if (numberOfPostsRemaining()[0] === 0) {
-			log('Validating that all posts were downloaded...', false);
-			setTimeout(() => {
+		log('Validating that all posts were downloaded...', false);
+		setTimeout(() => {
+			if (config.download_post_list_options.enabled) {
+				log(
+					'🎉 All done downloading posts from download_post_list.txt!',
+					false
+				);
+			} else {
 				log(
 					'🎉 All done downloading posts from ' +
 						subredditList[currentSubredditIndex] +
 						'!',
 					false
 				);
+			}
 
-				log(JSON.stringify(downloadedPosts), true);
-				if (currentSubredditIndex === subredditList.length - 1) {
-					log(
-						`\n📈 Downloading took ${timeDiff} seconds, at about ${msPerPost} seconds/post`,
-						false
-					);
-				}
+			log(JSON.stringify(downloadedPosts), true);
+			if (currentSubredditIndex === subredditList.length - 1) {
+				log(
+					`\n📈 Downloading took ${timeDiff} seconds, at about ${msPerPost} seconds/post`,
+					false
+				);
+			}
 
-				// default values for next run (important if being run multiple times)
-				downloadedPosts = {
-					subreddit: '',
-					self: 0,
-					media: 0,
-					link: 0,
-					failed: 0,
-					skipped_due_to_duplicate: 0,
-					skipped_due_to_fileType: 0,
-				};
+			// default values for next run (important if being run multiple times)
+			downloadedPosts = {
+				subreddit: '',
+				self: 0,
+				media: 0,
+				link: 0,
+				failed: 0,
+				skipped_due_to_duplicate: 0,
+				skipped_due_to_fileType: 0,
+			};
 
-				if (currentSubredditIndex < subredditList.length - 1) {
-					downloadNextSubreddit();
-				} else if (repeatForever) {
-					currentSubredditIndex = 0;
-					log(
-						`⏲️ Waiting ${timeBetweenRuns / 1000} seconds before rerunning...`,
-						false
-					);
-					setTimeout(function () {
+			if (currentSubredditIndex < subredditList.length - 1) {
+				downloadNextSubreddit();
+			} else if (repeatForever) {
+				currentSubredditIndex = 0;
+				log(
+					`⏲️ Waiting ${timeBetweenRuns / 1000} seconds before rerunning...`,
+					false
+				);
+				setTimeout(function () {
+					if (config.download_post_list_options.enabled) {
+						downloadFromPostListFile();
+					} else {
 						downloadSubredditPosts(subredditList[0], '');
-						startTime = new Date();
-					}, timeBetweenRuns);
-				} else {
-					startPrompt();
-				}
-				return true;
-			}, 1000);
-		}
+					}
+					startTime = new Date();
+				}, timeBetweenRuns);
+			} else {
+				startPrompt();
+			}
+			return true;
+		}, 1000);
 	} else {
 		if (numberOfPosts >= 99999999999999999999) {
 			log(
 				`Still downloading posts from ${chalk.cyan(
 					subredditList[currentSubredditIndex]
 				)}... (${numberOfPostsRemaining()[1]}/all)`,
+				false
+			);
+		} else if (config.download_post_list_options.enabled) {
+			log(
+				`Still downloading posts from ${chalk.cyan(
+					'download_post_list.txt'
+				)}... (${numberOfPostsRemaining()[1]}/${numberOfPosts})`,
 				false
 			);
 		} else {

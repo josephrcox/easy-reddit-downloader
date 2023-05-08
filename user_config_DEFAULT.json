@@ -1,15 +1,15 @@
 {
     "testingMode": false,
     "testingModeOptions": {
-        "subredditList": ["AskReddit","pics"],
         "numberOfPosts": 25,
         "sorting": "new",
         "time": "month",
         "repeatForever": true,
-        "timeBetweenRuns": 30000
+        "timeBetweenRuns": 30000,
+        "useYTDLforVideo": true
     },
     "download_post_list_options": {
-        "enabled": false,
+        "enabled": true,
         "repeatForever": false,
         "timeBetweenRuns": 3000
     },

@@ -14,6 +14,8 @@
     "axios": "^1.2.1",
     "chalk": "^4.1.2",
     "prompts": "^2.4.2",
-    "request": "^2.88.2"
+    "request": "^2.88.2",
+    "youtube-dl": "^3.5.0",
+    "youtube-dl-wrap": "^2.1.1"
   }
 }
