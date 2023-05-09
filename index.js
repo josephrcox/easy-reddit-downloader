@@ -775,18 +775,10 @@ async function downloadPost(post) {
 				// The media object has the actual URL.
 				if (useYTDLforVideo != true) {
 					const posttitle = post.name;
+					const youtubedl = require('youtube-dl-exec')
 
-					const YoutubeDlWrap = require("youtube-dl-wrap");
-					const youtubeDlWrap = new YoutubeDlWrap("/home/noexplorer/Downloads/youtube-dl");
-
-					let youtubeDlEventEmitter = youtubeDlWrap.exec([post.url,
-						"-o MEDIA-%(id)s"])
-  					// .on("progress", (progress) => 
-    				// console.log(progress.percent, progress.totalSize, progress.currentSpeed, progress.eta))
-  					// .on("youtubeDlEvent", (eventType, eventData) => console.log(eventType, eventData))
-  					.on("error", (error) => console.error(error))
-  					.on("close", () => console.log("Done downloading video post with link", post.url ))
-					console.log(youtubeDlEventEmitter.youtubeDlProcess.pid);
+					youtubedl([post.url ,"-o MEDIA-%(id)s"], {
+}					).then(output => console.log(output))
 				}
 				else {
 					downloadURL = post.media.reddit_video.fallback_url;
