@@ -13,7 +13,10 @@
   "dependencies": {
     "axios": "^1.2.1",
     "chalk": "^4.1.2",
+    "child_process": "^1.0.2",
+    "fluent-ffmpeg": "^2.1.2",
     "prompts": "^2.4.2",
-    "request": "^2.88.2"
+    "request": "^2.88.2",
+    "ytdl-core": "^4.11.4"
   }
 }
