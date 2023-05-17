@@ -81,6 +81,11 @@ For example, if there was a post that went to `https://www.google.com/` then the
 </html>
 ```
 
+### YouTube videos
+Starting with version v0.3.0, YouTube videos can be downloaded in MP4 format. You must have ffmpeg installed on your computer for this to work, download it here - https://ffmpeg.org/.
+
+You also must set `download_youtube_videos_experimental` to true in your `user_config.json` file. 
+
 ## Downloading users
 With the release of v0.2.0, I added the ability to download posts from a specific user. 
 
