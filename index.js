@@ -7,6 +7,10 @@ const prompts = require('prompts');
 const chalk = require('chalk');
 const axios = require('axios');
 
+const ytdl = require('ytdl-core');
+const ffmpeg = require('fluent-ffmpeg');
+const { spawn } = require('child_process');
+
 let config = require('./user_config_DEFAULT.json');
 
 // Variables used for logging
@@ -691,6 +695,7 @@ async function downloadPost(post) {
 		postTitleScrubbed = getFileName(post);
 
 		if (postType === 0) {
+			// DOWNLOAD A SELF POST
 			let toDownload = await shouldWeDownload(
 				post.subreddit,
 				`${postTitleScrubbed}.txt`
@@ -846,19 +851,95 @@ async function downloadPost(post) {
 					// With link posts, we create a simple HTML file that redirects to the post's URL.
 					// This enables the user to still "open" the link file, and it will redirect to the post.
 					// No comments or other data is stored.
-					let htmlFile = `<html><body><script type='text/javascript'>window.location.href = "${post.url}";</script></body></html>`;
 
-					fs.writeFile(
-						`${downloadDirectory}/${postTitleScrubbed}.html`,
-						htmlFile,
-						function (err) {
-							if (err) throw err;
-							downloadedPosts.link += 1;
-							if (checkIfDone(post.name)) {
-								return;
+					if (post.domain.includes('youtu') && config.download_youtube_videos_experimental) {
+						log(
+							`Downloading ${postTitleScrubbed} from YouTube... This may take a while...`,
+							false
+						);
+						let url = post.url;
+						try {
+							// Validate YouTube URL
+							if (!ytdl.validateURL(url)) {
+								throw new Error('Invalid YouTube URL');
 							}
+
+							// Get video info
+							const info = await ytdl.getInfo(url);
+							log(info, true);
+
+							// Choose the highest quality format available
+							const format = ytdl.chooseFormat(info.formats, {
+								quality: 'highest',
+							});
+
+							// Create a filename based on the video title
+							const fileName = `${postTitleScrubbed}.mp4`;
+
+							// Download audio stream
+							const audio = ytdl(url, { filter: 'audioonly' });
+							const audioPath = `${downloadDirectory}/${fileName}.mp3`;
+							audio.pipe(fs.createWriteStream(audioPath));
+
+							// Download video stream
+							const video = ytdl(url, { format });
+							const videoPath = `${downloadDirectory}/${fileName}.mp4`;
+							video.pipe(fs.createWriteStream(videoPath));
+
+							// Wait for both streams to finish downloading
+							await Promise.all([
+								new Promise((resolve) => audio.on('end', resolve)),
+								new Promise((resolve) => video.on('end', resolve)),
+							]);
+
+							// Merge audio and video using ffmpeg
+							ffmpeg()
+								.input(videoPath)
+								.input(audioPath)
+								.output(`${downloadDirectory}/${fileName}`)
+								.on('end', () => {
+									console.log('Download complete');
+									// Remove temporary audio and video files
+									fs.unlinkSync(audioPath);
+									fs.unlinkSync(videoPath);
+									downloadedPosts.link += 1;
+									if (checkIfDone(post.name)) {
+										return;
+									}
+								})
+								.run();
+						} catch (error) {
+							log(`Failed to download ${postTitleScrubbed} from YouTube. Do you have FFMPEG installed? https://ffmpeg.org/ `, false);
+							let htmlFile = `<html><body><script type='text/javascript'>window.location.href = "${post.url}";</script></body></html>`;
+
+							fs.writeFile(
+								`${downloadDirectory}/${postTitleScrubbed}.html`,
+								htmlFile,
+								function (err) {
+									if (err) throw err;
+									downloadedPosts.link += 1;
+									if (checkIfDone(post.name)) {
+										return;
+									}
+								}
+							);
 						}
-					);
+
+					} else {
+						let htmlFile = `<html><body><script type='text/javascript'>window.location.href = "${post.url}";</script></body></html>`;
+
+						fs.writeFile(
+							`${downloadDirectory}/${postTitleScrubbed}.html`,
+							htmlFile,
+							function (err) {
+								if (err) throw err;
+								downloadedPosts.link += 1;
+								if (checkIfDone(post.name)) {
+									return;
+								}
+							}
+						);
+					}
 				}
 			}
 		} else {
