@@ -96,21 +96,21 @@ if (testingMode) {
 console.clear(); // Clear the console
 log(
 	chalk.cyan(
-		'👋 Welcome to the easiest & most customizable Reddit Post Downloader!'
+		'👋 Welcome to the easiest & most customizable Reddit Post Downloader!',
 	),
-	false
+	false,
 );
 log(
 	chalk.yellow(
-		'😎 Contribute @ https://github.com/josephrcox/easy-reddit-downloader'
+		'😎 Contribute @ https://github.com/josephrcox/easy-reddit-downloader',
 	),
-	false
+	false,
 );
 log(
 	chalk.blue(
-		'🤔 Confused? Check out the README @ https://github.com/josephrcox/easy-reddit-downloader#readme\n'
+		'🤔 Confused? Check out the README @ https://github.com/josephrcox/easy-reddit-downloader#readme\n',
 	),
-	false
+	false,
 );
 // For debugging logs
 log('User config: ' + JSON.stringify(config), true);
@@ -135,18 +135,18 @@ function checkConfig() {
 	if (warnTheUser) {
 		log(
 			chalk.red(
-				'WARNING: Your file naming scheme (user_config.json) is poorly set, we recommend changing it.'
+				'WARNING: Your file naming scheme (user_config.json) is poorly set, we recommend changing it.',
 			),
-			false
+			false,
 		);
 	}
 
 	if (quitApplicaton) {
 		log(
 			chalk.red(
-				'ALERT: Your file naming scheme (user_config.json) does not have any options set. You can not download posts without filenames. Aborting. '
+				'ALERT: Your file naming scheme (user_config.json) does not have any options set. You can not download posts without filenames. Aborting. ',
 			),
-			false
+			false,
 		);
 		process.exit(1);
 	}
@@ -154,9 +154,9 @@ function checkConfig() {
 	if (quitApplicaton || warnTheUser) {
 		log(
 			chalk.red(
-				'Read about recommended naming schemes here - https://github.com/josephrcox/easy-reddit-downloader/blob/main/README.md#File-naming-scheme'
+				'Read about recommended naming schemes here - https://github.com/josephrcox/easy-reddit-downloader/blob/main/README.md#File-naming-scheme',
 			),
-			false
+			false,
 		);
 	}
 }
@@ -177,7 +177,7 @@ request.get(
 			if (version !== latestVersion) {
 				log(
 					`Hey! A new version (${latestVersion}) is available. \nConsider updating to the latest version with 'git pull'.\n`,
-					false
+					false,
 				);
 				startScript();
 			} else {
@@ -185,7 +185,7 @@ request.get(
 				startScript();
 			}
 		}
-	}
+	},
 );
 
 function startScript() {
@@ -354,15 +354,15 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 				`\n\n👀 Requesting posts from
 				https://www.reddit.com/user/${subreddit.replace(
 					'u/',
-					''
+					'',
 				)}/${sorting}/.json?sort=${sorting}&t=${time}&limit=${postsRemaining}&after=${lastPostId}\n`,
-				true
+				true,
 			);
 		} else {
 			log(
 				`\n\n👀 Requesting posts from
 			https://www.reddit.com/r/${subreddit}/${sorting}/.json?sort=${sorting}&t=${time}&limit=${postsRemaining}&after=${lastPostId}\n`,
-				true
+				true,
 			);
 		}
 
@@ -372,7 +372,7 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 
 		try {
 			response = await axios.get(
-				`https://www.reddit.com/r/${subreddit}/${sorting}/.json?sort=${sorting}&t=${time}&limit=${postsRemaining}&after=${lastPostId}`
+				`https://www.reddit.com/r/${subreddit}/${sorting}/.json?sort=${sorting}&t=${time}&limit=${postsRemaining}&after=${lastPostId}`,
 			);
 
 			data = await response.data;
@@ -390,7 +390,7 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 		} catch (err) {
 			log(
 				`\n\nERROR: There was a problem fetching posts for ${subreddit}. This is likely because the subreddit is private, banned, or doesn't exist.`,
-				true
+				true,
 			);
 			if (subredditList.length > 1) {
 				if (currentSubredditIndex > subredditList.length - 1) {
@@ -472,12 +472,12 @@ async function downloadUser(user, currentUserAfter) {
 		// as well as a boolean if the log should be displayed to the user.
 		let reqUrl = `https://www.reddit.com/user/${user.replace(
 			'u/',
-			''
+			'',
 		)}/submitted/.json?limit=${postsRemaining}&after=${lastPostId}`;
 		log(
 			`\n\n👀 Requesting posts from
 			${reqUrl}\n`,
-			false
+			false,
 		);
 
 		// Get the top posts from the subreddit
@@ -503,7 +503,7 @@ async function downloadUser(user, currentUserAfter) {
 		} catch (err) {
 			log(
 				`\n\nERROR: There was a problem fetching posts for ${user}. This is likely because the subreddit is private, banned, or doesn't exist.`,
-				true
+				true,
 			);
 			if (subredditList.length > 1) {
 				if (currentSubredditIndex > subredditList.length - 1) {
@@ -567,23 +567,23 @@ async function downloadFromPostListFile() {
 	if (numberOfPosts === 0) {
 		log(
 			chalk.red(
-				'ERROR: There are no posts in the download_post_list.txt file. Please add some posts to the file and try again.\n'
+				'ERROR: There are no posts in the download_post_list.txt file. Please add some posts to the file and try again.\n',
 			),
-			false
+			false,
 		);
 		log(
 			chalk.yellow(
-				'If you are trying to download posts from a subreddit, please set "download_post_list_options.enabled" to false in the user_config.json file.\n'
+				'If you are trying to download posts from a subreddit, please set "download_post_list_options.enabled" to false in the user_config.json file.\n',
 			),
-			false
+			false,
 		);
 		process.exit(1);
 	}
 
 	log(
 		chalk.green(
-			`Starting download of ${numberOfPosts} posts from the download_post_list.txt file.\n`
-		)
+			`Starting download of ${numberOfPosts} posts from the download_post_list.txt file.\n`,
+		),
 	);
 	// iterate over the lines and download the posts
 	for (let i = 0; i < lines.length; i++) {
@@ -632,7 +632,7 @@ function getPostType(post, postTypeOptions) {
 	}
 	log(
 		`Post has type: ${postTypeOptions[postType]} due to their post hint: ${post.post_hint} and domain: ${post.domain}`,
-		true
+		true,
 	);
 	return postType;
 }
@@ -664,7 +664,7 @@ async function downloadMediaFile(downloadURL, filePath, postName) {
 		if (error.code === 'ENOTFOUND') {
 			log(
 				'ERROR: Hostname not found for: ' + downloadURL + '\n... skipping post',
-				true
+				true,
 			);
 		} else {
 			log('ERROR: ' + error, true);
@@ -698,7 +698,7 @@ async function downloadPost(post) {
 			// DOWNLOAD A SELF POST
 			let toDownload = await shouldWeDownload(
 				post.subreddit,
-				`${postTitleScrubbed}.txt`
+				`${postTitleScrubbed}.txt`,
 			);
 			if (!toDownload) {
 				downloadedPosts.skipped_due_to_duplicate += 1;
@@ -757,7 +757,7 @@ async function downloadPost(post) {
 							if (checkIfDone(post.name)) {
 								return;
 							}
-						}
+						},
 					);
 				}
 			}
@@ -770,7 +770,7 @@ async function downloadPost(post) {
 					log(
 						"Using fallback URL for Reddit's GIF preview." +
 							post.preview.reddit_video_preview,
-						true
+						true,
 					);
 					downloadURL = post.preview.reddit_video_preview.fallback_url;
 					fileType = 'mp4';
@@ -816,7 +816,7 @@ async function downloadPost(post) {
 			} else {
 				let toDownload = await shouldWeDownload(
 					post.subreddit,
-					`${postTitleScrubbed}.${fileType}`
+					`${postTitleScrubbed}.${fileType}`,
 				);
 				if (!toDownload) {
 					downloadedPosts.skipped_due_to_duplicate += 1;
@@ -827,7 +827,7 @@ async function downloadPost(post) {
 					downloadMediaFile(
 						downloadURL,
 						`${downloadDirectory}/${postTitleScrubbed}.${fileType}`,
-						post.name
+						post.name,
 					);
 				}
 			}
@@ -839,7 +839,7 @@ async function downloadPost(post) {
 			} else {
 				let toDownload = await shouldWeDownload(
 					post.subreddit,
-					`${postTitleScrubbed}.html`
+					`${postTitleScrubbed}.html`,
 				);
 				if (!toDownload) {
 					downloadedPosts.skipped_due_to_duplicate += 1;
@@ -852,10 +852,13 @@ async function downloadPost(post) {
 					// This enables the user to still "open" the link file, and it will redirect to the post.
 					// No comments or other data is stored.
 
-					if (post.domain.includes('youtu') && config.download_youtube_videos_experimental) {
+					if (
+						post.domain.includes('youtu') &&
+						config.download_youtube_videos_experimental
+					) {
 						log(
 							`Downloading ${postTitleScrubbed} from YouTube... This may take a while...`,
-							false
+							false,
 						);
 						let url = post.url;
 						try {
@@ -909,7 +912,10 @@ async function downloadPost(post) {
 								})
 								.run();
 						} catch (error) {
-							log(`Failed to download ${postTitleScrubbed} from YouTube. Do you have FFMPEG installed? https://ffmpeg.org/ `, false);
+							log(
+								`Failed to download ${postTitleScrubbed} from YouTube. Do you have FFMPEG installed? https://ffmpeg.org/ `,
+								false,
+							);
 							let htmlFile = `<html><body><script type='text/javascript'>window.location.href = "${post.url}";</script></body></html>`;
 
 							fs.writeFile(
@@ -921,10 +927,9 @@ async function downloadPost(post) {
 									if (checkIfDone(post.name)) {
 										return;
 									}
-								}
+								},
 							);
 						}
-
 					} else {
 						let htmlFile = `<html><body><script type='text/javascript'>window.location.href = "${post.url}";</script></body></html>`;
 
@@ -937,7 +942,7 @@ async function downloadPost(post) {
 								if (checkIfDone(post.name)) {
 									return;
 								}
-							}
+							},
 						);
 					}
 				}
@@ -975,9 +980,9 @@ function shouldWeDownload(subreddit, postTitleWithPrefixAndExtension) {
 		if (config.redownload_posts === undefined) {
 			log(
 				chalk.red(
-					"ALERT: Please note that the 'redownload_posts' option is now available in user_config. See the default JSON for example usage."
+					"ALERT: Please note that the 'redownload_posts' option is now available in user_config. See the default JSON for example usage.",
 				),
-				true
+				true,
 			);
 		}
 		return true;
@@ -985,7 +990,7 @@ function shouldWeDownload(subreddit, postTitleWithPrefixAndExtension) {
 		// Check if the post in the subreddit folder already exists.
 		// If it does, we don't need to download it again.
 		let postExists = fs.existsSync(
-			`${downloadDirectory}/${postTitleWithPrefixAndExtension}`
+			`${downloadDirectory}/${postTitleWithPrefixAndExtension}`,
 		);
 		return !postExists;
 	}
@@ -1008,9 +1013,9 @@ function checkIfDone(lastPostId, override) {
 			// Still downloading from post list
 			log(
 				`Still downloading posts from ${chalk.cyan(
-					subredditList[currentSubredditIndex]
+					subredditList[currentSubredditIndex],
 				)}... (${numberOfPostsRemaining()[1]}/all)`,
-				false
+				false,
 			);
 		} else {
 			// Done downloading from post list
@@ -1029,7 +1034,7 @@ function checkIfDone(lastPostId, override) {
 					`⏲️ Waiting ${
 						config.download_post_list_options.timeBetweenRuns / 1000
 					} seconds before rerunning...`,
-					false
+					false,
 				);
 				setTimeout(function () {
 					downloadFromPostListFile();
@@ -1054,16 +1059,16 @@ function checkIfDone(lastPostId, override) {
 		if (numberOfPosts >= 99999999999999999999) {
 			log(
 				`Still downloading posts from ${chalk.cyan(
-					subredditList[currentSubredditIndex]
+					subredditList[currentSubredditIndex],
 				)}... (${numberOfPostsRemaining()[1]}/all)`,
-				false
+				false,
 			);
 		} else {
 			log(
 				`Still downloading posts from ${chalk.cyan(
-					subredditList[currentSubredditIndex]
+					subredditList[currentSubredditIndex],
 				)}... (${numberOfPostsRemaining()[1]}/${numberOfPosts})`,
-				false
+				false,
 			);
 		}
 		if (numberOfPostsRemaining()[0] === 0) {
@@ -1073,14 +1078,14 @@ function checkIfDone(lastPostId, override) {
 					'🎉 All done downloading posts from ' +
 						subredditList[currentSubredditIndex] +
 						'!',
-					false
+					false,
 				);
 
 				log(JSON.stringify(downloadedPosts), true);
 				if (currentSubredditIndex === subredditList.length - 1) {
 					log(
 						`\n📈 Downloading took ${timeDiff} seconds, at about ${msPerPost} seconds/post`,
-						false
+						false,
 					);
 				}
 
@@ -1101,7 +1106,7 @@ function checkIfDone(lastPostId, override) {
 					currentSubredditIndex = 0;
 					log(
 						`⏲️ Waiting ${timeBetweenRuns / 1000} seconds before rerunning...`,
-						false
+						false,
 					);
 					setTimeout(function () {
 						downloadSubredditPosts(subredditList[0], '');
@@ -1117,16 +1122,16 @@ function checkIfDone(lastPostId, override) {
 		if (numberOfPosts >= 99999999999999999999) {
 			log(
 				`Still downloading posts from ${chalk.cyan(
-					subredditList[currentSubredditIndex]
+					subredditList[currentSubredditIndex],
 				)}... (${numberOfPostsRemaining()[1]}/all)`,
-				false
+				false,
 			);
 		} else {
 			log(
 				`Still downloading posts from ${chalk.cyan(
-					subredditList[currentSubredditIndex]
+					subredditList[currentSubredditIndex],
 				)}... (${numberOfPostsRemaining()[1]}/${numberOfPosts})`,
-				false
+				false,
 			);
 		}
 
@@ -1135,7 +1140,7 @@ function checkIfDone(lastPostId, override) {
 				`\t- ${Object.keys(downloadedPosts)[i]}: ${
 					Object.values(downloadedPosts)[i]
 				}`,
-				true
+				true,
 			);
 		}
 		log('\n', true);
@@ -1143,7 +1148,7 @@ function checkIfDone(lastPostId, override) {
 		if (numberOfPostsRemaining()[1] % 100 == 0) {
 			return downloadSubredditPosts(
 				subredditList[currentSubredditIndex],
-				lastPostId
+				lastPostId,
 			);
 		}
 		return false;
@@ -1220,7 +1225,7 @@ function log(message, detailed) {
 		if (config.local_logs_naming_scheme.showSubreddits) {
 			let subredditListString = JSON.stringify(subredditList).replace(
 				/[^a-zA-Z0-9,]/g,
-				''
+				'',
 			);
 			logFileName += `${subredditListString} - `;
 		}
@@ -1241,7 +1246,7 @@ function log(message, detailed) {
 			userLogs,
 			function (err) {
 				if (err) throw err;
-			}
+			},
 		);
 	}
 }
