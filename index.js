@@ -189,7 +189,6 @@ request.get(
 );
 
 function startScript() {
-	startTime = new Date();
 	if (!testingMode && !config.download_post_list_options.enabled) {
 		startPrompt();
 	} else {
@@ -287,6 +286,7 @@ async function startPrompt() {
 	}
 
 	// With the data gathered, call the APIs and download the posts
+	startTime = new Date();
 	downloadSubredditPosts(subredditList[0], '');
 }
 
@@ -1037,8 +1037,8 @@ function checkIfDone(lastPostId, override) {
 					false,
 				);
 				setTimeout(function () {
-					downloadFromPostListFile();
 					startTime = new Date();
+					downloadFromPostListFile();
 				}, timeBetweenRuns);
 			}
 		}
