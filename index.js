@@ -9,7 +9,6 @@ const axios = require('axios');
 
 const ytdl = require('ytdl-core');
 const ffmpeg = require('fluent-ffmpeg');
-const { spawn } = require('child_process');
 
 let config = require('./user_config_DEFAULT.json');
 
@@ -1167,6 +1166,12 @@ function getFileName(post) {
 		var month = (date.getMonth() + 1).toString().padStart(2, '0');
 		var day = date.getDate().toString().padStart(2, '0');
 		fileName += `${year}-${month}-${day}`;
+	}
+	if (
+		config.file_naming_scheme.showScore ||
+		config.file_naming_scheme.showScore === undefined
+	) {
+		fileName += `_score=${post.score}`;
 	}
 	if (
 		config.file_naming_scheme.showAuthor ||
