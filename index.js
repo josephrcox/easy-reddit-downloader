@@ -34,6 +34,7 @@ let sorting = 'top'; // How to sort the posts (top, new, hot, rising, controvers
 let time = 'all'; // What time period to sort by (hour, day, week, month, year, all)
 let repeatForever = false; // If true, the program will repeat every timeBetweenRuns milliseconds
 let downloadDirectory = ''; // Where to download the files to, defined when
+const postDelayMilliseconds = 250;
 
 let currentUserAfter = ''; // Used to track the after value for the API call, this is used to get the next X posts
 
@@ -421,14 +422,15 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 
 		responseSize = data.data.children.length;
 
-		await data.data.children.forEach(async (child, i) => {
+		for (const child of data.data.children) {
+			await sleep();
 			try {
 				const post = child.data;
-				downloadPost(post);
+				await downloadPost(post); // Make sure to await this as well
 			} catch (e) {
 				log(e, true);
 			}
-		});
+		}
 	} catch (error) {
 		// throw the error
 		throw error;
@@ -525,14 +527,15 @@ async function downloadUser(user, currentUserAfter) {
 
 		responseSize = data.data.children.length;
 
-		await data.data.children.forEach(async (child, i) => {
+		for (const child of data.data.children) {
+			await sleep();
 			try {
 				const post = child.data;
-				downloadPost(post);
+				await downloadPost(post); // Make sure to await this as well
 			} catch (e) {
 				log(e, true);
 			}
-		});
+		}
 	} catch (error) {
 		// throw the error
 		throw error;
@@ -669,6 +672,10 @@ async function downloadMediaFile(downloadURL, filePath, postName) {
 			log('ERROR: ' + error, true);
 		}
 	}
+}
+
+function sleep() {
+	return new Promise((resolve) => setTimeout(resolve, postDelayMilliseconds));
 }
 
 async function downloadPost(post) {
