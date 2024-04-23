@@ -34,6 +34,7 @@ let sorting = 'top'; // How to sort the posts (top, new, hot, rising, controvers
 let time = 'all'; // What time period to sort by (hour, day, week, month, year, all)
 let repeatForever = false; // If true, the program will repeat every timeBetweenRuns milliseconds
 let downloadDirectory = ''; // Where to download the files to, defined when
+let downloadDirectoryBase = "./downloads";  // Default download path, can be overridden
 const postDelayMilliseconds = 250;
 
 let currentUserAfter = ''; // Used to track the after value for the API call, this is used to get the next X posts
@@ -90,6 +91,9 @@ if (testingMode) {
 	time = config.testingModeOptions.time;
 	repeatForever = config.testingModeOptions.repeatForever;
 	timeBetweenRuns = config.testingModeOptions.timeBetweenRuns;
+	if (config.testingModeOptions.downloadDirectory) {
+		downloadDirectoryBase = config.testingModeOptions.downloadDirectory;
+	}
 }
 
 // Start actions
@@ -215,6 +219,7 @@ async function startPrompt() {
 			name: 'numberOfPosts',
 			message:
 				'How many posts would you like to attempt to download? If you would like to download all posts, enter 0.',
+			initial: 0,
 			validate: (value) =>
 				// check if value is a number
 				!isNaN(value) ? true : `Please enter a number`,
@@ -224,6 +229,7 @@ async function startPrompt() {
 			name: 'sorting',
 			message:
 				'How would you like to sort? (top, new, hot, rising, controversial)',
+			initial: 'top',
 			validate: (value) =>
 				value.toLowerCase() === 'top' ||
 				value.toLowerCase() === 'new' ||
@@ -237,6 +243,7 @@ async function startPrompt() {
 			type: 'text',
 			name: 'time',
 			message: 'During what time period? (hour, day, week, month, year, all)',
+			initial: 'month',
 			validate: (value) =>
 				value.toLowerCase() === 'hour' ||
 				value.toLowerCase() === 'day' ||
@@ -260,6 +267,12 @@ async function startPrompt() {
 			name: 'timeBetweenRuns',
 			message: 'How often would you like to run this? (in ms)',
 		},
+		{
+			type: 'text',
+			name: 'downloadDirectory',
+			message: 'Change the download path, defaults to ./downloads',
+			initial: '',
+		},
 	];
 
 	const result = await prompts(questions);
@@ -268,6 +281,9 @@ async function startPrompt() {
 	numberOfPosts = result.numberOfPosts;
 	sorting = result.sorting.replace(/\s/g, '');
 	time = result.time.replace(/\s/g, '');
+	if (result.downloadDirectory) {
+		downloadDirectoryBase = result.downloadDirectory;
+	}
 
 	// clean up the subreddit list in case the user puts in invalid chars
 	for (let i = 0; i < subredditList.length; i++) {
@@ -293,15 +309,15 @@ async function startPrompt() {
 function makeDirectories() {
 	// Make needed directories for downloads,
 	// clean and nsfw are made nomatter the subreddits downloaded
-	if (!fs.existsSync('./downloads')) {
-		fs.mkdirSync('./downloads');
+	if (!fs.existsSync(downloadDirectoryBase)) {
+		fs.mkdirSync(downloadDirectoryBase);
 	}
 	if (config.separate_clean_nsfw) {
-		if (!fs.existsSync('./downloads/clean')) {
-			fs.mkdirSync('./downloads/clean');
+		if (!fs.existsSync(downloadDirectoryBase +'/clean')) {
+			fs.mkdirSync(downloadDirectoryBase +'/clean');
 		}
-		if (!fs.existsSync('./downloads/nsfw')) {
-			fs.mkdirSync('./downloads/nsfw');
+		if (!fs.existsSync(downloadDirectoryBase +'/nsfw')) {
+			fs.mkdirSync(downloadDirectoryBase +'/nsfw');
 		}
 	}
 }
@@ -409,9 +425,9 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 		downloadedPosts.subreddit = data.data.children[0].data.subreddit;
 
 		if (!config.separate_clean_nsfw) {
-			downloadDirectory = `./downloads/${data.data.children[0].data.subreddit}`;
+			downloadDirectory = downloadDirectoryBase + `/${data.data.children[0].data.subreddit}`;
 		} else {
-			downloadDirectory = `./downloads/${isOver18}/${data.data.children[0].data.subreddit}`;
+			downloadDirectory = downloadDirectoryBase + `/${isOver18}/${data.data.children[0].data.subreddit}`;
 		}
 
 		// Make sure the image directory exists
@@ -517,7 +533,7 @@ async function downloadUser(user, currentUserAfter) {
 			}
 		}
 
-		downloadDirectory = `./downloads/user_${user.replace('u/', '')}`;
+		downloadDirectory = downloadDirectoryBase + `/user_${user.replace('u/', '')}`;
 
 		// Make sure the image directory exists
 		// If no directory is found, create one
@@ -598,9 +614,9 @@ async function downloadFromPostListFile() {
 			makeDirectories();
 
 			if (!config.separate_clean_nsfw) {
-				downloadDirectory = `./downloads/${post.subreddit}`;
+				downloadDirectory = downloadDirectoryBase + `/${post.subreddit}`;
 			} else {
-				downloadDirectory = `./downloads/${isOver18}/${post.subreddit}`;
+				downloadDirectory = downloadDirectoryBase + `/${isOver18}/${post.subreddit}`;
 			}
 
 			// Make sure the image directory exists
@@ -1193,6 +1209,18 @@ function getFileName(post) {
 		let title = sanitizeFileName(post.title);
 		fileName += `_${title}`;
 	}
+
+	// remove special chars from name
+	fileName = fileName.replace(/(?:\r\n|\r|\n|\t)/g, '');
+
+	if (fileName.search(/\ufe0e/g) >= -1) {
+		fileName = fileName.replace(/\ufe0e/g, "");
+	}
+	
+	if (fileName.search(/\ufe0f/g) >= -1) {
+		fileName = fileName.replace(/\ufe0f/g, "");
+	}	
+
 	// The max length for most systems is about 255. To give some wiggle room, I'm doing 240
 	if (fileName.length > 240) {
 		fileName = fileName.substring(0, 240);
@@ -1216,7 +1244,7 @@ function log(message, detailed) {
 	// This function takes a message string and a boolean.
 	// If the boolean is true, the message will be logged to the console, otherwise it
 	// will only be logged to the log file.
-	userLogs += message + '\r\n\n';
+	userLogs += message + '\r\n';
 	let visibleToUser = true;
 	if (detailed) {
 		visibleToUser = config.detailed_logs;
