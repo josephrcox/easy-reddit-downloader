@@ -624,7 +624,8 @@ function getPostType(post, postTypeOptions) {
 		(post.post_hint === 'link' &&
 			post.domain.includes('imgur') &&
 			!post.url_overridden_by_dest.includes('gallery')) ||
-		post.domain.includes('i.redd.it')
+		post.domain.includes('i.redd.it') ||
+		post.domain.includes('i.reddituploads.com')
 	) {
 		postType = 1;
 	} else if (post.poll_data != undefined) {
@@ -1179,6 +1180,12 @@ function getFileName(post) {
 		config.file_naming_scheme.showScore === undefined
 	) {
 		fileName += `_score=${post.score}`;
+	}
+	if (
+		config.file_naming_scheme.showSubreddit ||
+		config.file_naming_scheme.showSubreddit === undefined
+	) {
+		fileName += `_${post.subreddit}`;
 	}
 	if (
 		config.file_naming_scheme.showAuthor ||
