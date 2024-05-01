@@ -615,6 +615,7 @@ async function downloadFromPostListFile() {
 
 function getPostType(post, postTypeOptions) {
 	log(`Analyzing post with title: ${post.title}) and URL: ${post.url}`, true);
+	log(post);
 	if (post.post_hint === 'self' || post.is_self) {
 		postType = 0;
 	} else if (
@@ -630,6 +631,11 @@ function getPostType(post, postTypeOptions) {
 		postType = 1;
 	} else if (post.poll_data != undefined) {
 		postType = 3; // UNSUPPORTED
+	} else if (
+		post.domain.includes('reddit.com') &&
+		post.is_gallery
+	) {
+		postType = 4;
 	} else {
 		postType = 2;
 	}
@@ -680,7 +686,7 @@ function sleep() {
 }
 
 async function downloadPost(post) {
-	let postTypeOptions = ['self', 'media', 'link', 'poll'];
+	let postTypeOptions = ['self', 'media', 'link', 'poll', 'gallery'];
 	let postType = -1; // default to no postType until one is found
 
 	// Determine the type of post. If no type is found, default to link as a last resort.
@@ -688,12 +694,57 @@ async function downloadPost(post) {
 	// save properly.
 	postType = getPostType(post, postTypeOptions);
 
+	// Array of possible (supported) image and video formats
+	const imageFormats = ['jpeg', 'jpg', 'gif', 'png', 'mp4', 'webm', 'gifv'];
+
 	// All posts should have URLs, so just make sure that it does.
 	// If the post doesn't have a URL, then it should be skipped.
-	if (postType != 3 && post.url !== undefined) {
-		// Array of possible (supported) image and video formats
-		const imageFormats = ['jpeg', 'jpg', 'gif', 'png', 'mp4', 'webm', 'gifv'];
+	if (postType == 4) {
+		// Download the gallery
+		log(post.media_metadata);
+		let postTitleScrubbed = getFileName(post);
 
+		if (!config.download_media_posts) {  // TODO change to download_gallery_posts once tested
+			log(`Skipping gallery post with title: ${post.title}`, true);
+			downloadedPosts.skipped_due_to_fileType += 1;
+			return checkIfDone(post.name);
+		}
+
+		let newDownloads = Object.keys(post.media_metadata).length;
+		for (const [id, value] of Object.entries(post.media_metadata)) {
+			log(`Processing ${id}`);
+			let downloadUrl = value['s']['u'].replaceAll('&amp;', '&');
+			log(`Download URL: ${downloadUrl}`);
+			let shortUrl = downloadUrl.split('?')[0]
+			let fileType = shortUrl.split('.').pop()
+
+			// Create directory for gallery
+			let postDirectory = `${downloadDirectory}/${postTitleScrubbed}`;
+			if (!fs.existsSync(postDirectory)) {
+				fs.mkdirSync(postDirectory);
+			}
+			let filePath = `${postTitleScrubbed}/${id}.${fileType}`;
+			let toDownload = await shouldWeDownload(
+				post.subreddit,
+				filePath,
+			);
+			log(`DL? ${toDownload}`);
+			if (!toDownload) {
+				if (--newDownloads === 0) {
+					downloadedPosts.skipped_due_to_duplicate += 1;
+					if (checkIfDone(post.name)) {
+						return;
+					}
+				}
+			} else {
+				downloadMediaFile(
+					downloadUrl,
+					`${downloadDirectory}/${filePath}`,
+					post.name,	
+				);
+			}
+		}
+	} else if (postType != 3 && post.url !== undefined) {
 		let downloadURL = post.url;
 		// Get the file type of the post via the URL. If it ends in .jpg, then it's a jpg.
 		let fileType = downloadURL.split('.').pop();
