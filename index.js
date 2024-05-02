@@ -615,7 +615,6 @@ async function downloadFromPostListFile() {
 
 function getPostType(post, postTypeOptions) {
 	log(`Analyzing post with title: ${post.title}) and URL: ${post.url}`, true);
-	log(post);
 	if (post.post_hint === 'self' || post.is_self) {
 		postType = 0;
 	} else if (
@@ -700,35 +699,37 @@ async function downloadPost(post) {
 	// All posts should have URLs, so just make sure that it does.
 	// If the post doesn't have a URL, then it should be skipped.
 	if (postType == 4) {
-		// Download the gallery
-		log(post.media_metadata);
-		let postTitleScrubbed = getFileName(post);
-
 		if (!config.download_media_posts) {  // TODO change to download_gallery_posts once tested
+		// Don't download the gallery if we don't want to		
 			log(`Skipping gallery post with title: ${post.title}`, true);
 			downloadedPosts.skipped_due_to_fileType += 1;
 			return checkIfDone(post.name);
 		}
 
+		// The title will be the directory name
+		const postTitleScrubbed = getFileName(post);
 		let newDownloads = Object.keys(post.media_metadata).length;
-		for (const [id, value] of Object.entries(post.media_metadata)) {
-			log(`Processing ${id}`);
-			let downloadUrl = value['s']['u'].replaceAll('&amp;', '&');
-			log(`Download URL: ${downloadUrl}`);
-			let shortUrl = downloadUrl.split('?')[0]
-			let fileType = shortUrl.split('.').pop()
+		// gallery_data retains the order of the gallery, so we loop over this
+		// media_id can be used as the key in media_metadata
+		for (const {media_id, id} of post.gallery_data.items) {
+			const media = post.media_metadata[media_id];
+			// s=highest quality (for some reason), u=URL
+			// URL contains &amp; instead of &
+			const downloadUrl = media['s']['u'].replaceAll('&amp;', '&');
+			const shortUrl = downloadUrl.split('?')[0]
+			const fileType = shortUrl.split('.').pop()
 
 			// Create directory for gallery
-			let postDirectory = `${downloadDirectory}/${postTitleScrubbed}`;
+			const postDirectory = `${downloadDirectory}/${postTitleScrubbed}`;
 			if (!fs.existsSync(postDirectory)) {
 				fs.mkdirSync(postDirectory);
 			}
-			let filePath = `${postTitleScrubbed}/${id}.${fileType}`;
-			let toDownload = await shouldWeDownload(
+			const filePath = `${postTitleScrubbed}/${id}.${fileType}`;
+			const toDownload = await shouldWeDownload(
 				post.subreddit,
 				filePath,
 			);
-			log(`DL? ${toDownload}`);
+			
 			if (!toDownload) {
 				if (--newDownloads === 0) {
 					downloadedPosts.skipped_due_to_duplicate += 1;
