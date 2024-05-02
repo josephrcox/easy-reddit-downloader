@@ -23,7 +23,8 @@
         "showDateAndTime": true,
         "showAuthor": true,
         "showTitle": true,
-        "showScore": true
+        "showScore": true,
+        "showSubreddit": true
     },
     "download_self_posts": true,
     "download_media_posts": true,
