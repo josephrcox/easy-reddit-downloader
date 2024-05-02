@@ -710,9 +710,9 @@ async function downloadPost(post) {
 		const postTitleScrubbed = getFileName(post);
 		let newDownloads = Object.keys(post.media_metadata).length;
 		// gallery_data retains the order of the gallery, so we loop over this
-		// mediaId can be used as the key in media_metadata
-		for (const {mediaId, id} of post.gallery_data.items) {
-			const media = post.media_metadata[mediaId];
+		// media_id can be used as the key in media_metadata
+		for (const {media_id, id} of post.gallery_data.items) {
+			const media = post.media_metadata[media_id];
 			// s=highest quality (for some reason), u=URL
 			// URL contains &amp; instead of &
 			const downloadUrl = media['s']['u'].replaceAll('&amp;', '&');
