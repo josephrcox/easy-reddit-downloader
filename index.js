@@ -699,8 +699,8 @@ async function downloadPost(post) {
 	// All posts should have URLs, so just make sure that it does.
 	// If the post doesn't have a URL, then it should be skipped.
 	if (postType == 4) {
-		if (!config.download_media_posts) {  // TODO change to download_gallery_posts once tested
 		// Don't download the gallery if we don't want to		
+		if (!config.download_gallery_posts) {
 			log(`Skipping gallery post with title: ${post.title}`, true);
 			downloadedPosts.skipped_due_to_fileType += 1;
 			return checkIfDone(post.name);

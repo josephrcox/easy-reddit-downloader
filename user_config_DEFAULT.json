@@ -28,6 +28,7 @@
     "download_self_posts": true,
     "download_media_posts": true,
     "download_link_posts": true,
+    "download_gallery_posts": true,
     "download_youtube_videos_experimental": false,
     "download_comments": true,
     "separate_clean_nsfw": false,
