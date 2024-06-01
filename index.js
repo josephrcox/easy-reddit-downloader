@@ -34,7 +34,7 @@ let sorting = 'top'; // How to sort the posts (top, new, hot, rising, controvers
 let time = 'all'; // What time period to sort by (hour, day, week, month, year, all)
 let repeatForever = false; // If true, the program will repeat every timeBetweenRuns milliseconds
 let downloadDirectory = ''; // Where to download the files to, defined when
-let downloadDirectoryBase = "./downloads";  // Default download path, can be overridden
+let downloadDirectoryBase = './downloads'; // Default download path, can be overridden
 const postDelayMilliseconds = 250;
 
 let currentUserAfter = ''; // Used to track the after value for the API call, this is used to get the next X posts
@@ -313,11 +313,11 @@ function makeDirectories() {
 		fs.mkdirSync(downloadDirectoryBase);
 	}
 	if (config.separate_clean_nsfw) {
-		if (!fs.existsSync(downloadDirectoryBase +'/clean')) {
-			fs.mkdirSync(downloadDirectoryBase +'/clean');
+		if (!fs.existsSync(downloadDirectoryBase + '/clean')) {
+			fs.mkdirSync(downloadDirectoryBase + '/clean');
 		}
-		if (!fs.existsSync(downloadDirectoryBase +'/nsfw')) {
-			fs.mkdirSync(downloadDirectoryBase +'/nsfw');
+		if (!fs.existsSync(downloadDirectoryBase + '/nsfw')) {
+			fs.mkdirSync(downloadDirectoryBase + '/nsfw');
 		}
 	}
 }
@@ -425,9 +425,12 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 		downloadedPosts.subreddit = data.data.children[0].data.subreddit;
 
 		if (!config.separate_clean_nsfw) {
-			downloadDirectory = downloadDirectoryBase + `/${data.data.children[0].data.subreddit}`;
+			downloadDirectory =
+				downloadDirectoryBase + `/${data.data.children[0].data.subreddit}`;
 		} else {
-			downloadDirectory = downloadDirectoryBase + `/${isOver18}/${data.data.children[0].data.subreddit}`;
+			downloadDirectory =
+				downloadDirectoryBase +
+				`/${isOver18}/${data.data.children[0].data.subreddit}`;
 		}
 
 		// Make sure the image directory exists
@@ -533,7 +536,8 @@ async function downloadUser(user, currentUserAfter) {
 			}
 		}
 
-		downloadDirectory = downloadDirectoryBase + `/user_${user.replace('u/', '')}`;
+		downloadDirectory =
+			downloadDirectoryBase + `/user_${user.replace('u/', '')}`;
 
 		// Make sure the image directory exists
 		// If no directory is found, create one
@@ -616,7 +620,8 @@ async function downloadFromPostListFile() {
 			if (!config.separate_clean_nsfw) {
 				downloadDirectory = downloadDirectoryBase + `/${post.subreddit}`;
 			} else {
-				downloadDirectory = downloadDirectoryBase + `/${isOver18}/${post.subreddit}`;
+				downloadDirectory =
+					downloadDirectoryBase + `/${isOver18}/${post.subreddit}`;
 			}
 
 			// Make sure the image directory exists
@@ -1267,12 +1272,12 @@ function getFileName(post) {
 	fileName = fileName.replace(/(?:\r\n|\r|\n|\t)/g, '');
 
 	if (fileName.search(/\ufe0e/g) >= -1) {
-		fileName = fileName.replace(/\ufe0e/g, "");
+		fileName = fileName.replace(/\ufe0e/g, '');
 	}
-	
+
 	if (fileName.search(/\ufe0f/g) >= -1) {
-		fileName = fileName.replace(/\ufe0f/g, "");
-	}	
+		fileName = fileName.replace(/\ufe0f/g, '');
+	}
 
 	// The max length for most systems is about 255. To give some wiggle room, I'm doing 240
 	if (fileName.length > 240) {
