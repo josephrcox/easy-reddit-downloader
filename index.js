@@ -630,10 +630,7 @@ function getPostType(post, postTypeOptions) {
 		postType = 1;
 	} else if (post.poll_data != undefined) {
 		postType = 3; // UNSUPPORTED
-	} else if (
-		post.domain.includes('reddit.com') &&
-		post.is_gallery
-	) {
+	} else if (post.domain.includes('reddit.com') && post.is_gallery) {
 		postType = 4;
 	} else {
 		postType = 2;
@@ -699,7 +696,7 @@ async function downloadPost(post) {
 	// All posts should have URLs, so just make sure that it does.
 	// If the post doesn't have a URL, then it should be skipped.
 	if (postType == 4) {
-		// Don't download the gallery if we don't want to		
+		// Don't download the gallery if we don't want to
 		if (!config.download_gallery_posts) {
 			log(`Skipping gallery post with title: ${post.title}`, true);
 			downloadedPosts.skipped_due_to_fileType += 1;
@@ -711,13 +708,13 @@ async function downloadPost(post) {
 		let newDownloads = Object.keys(post.media_metadata).length;
 		// gallery_data retains the order of the gallery, so we loop over this
 		// media_id can be used as the key in media_metadata
-		for (const {media_id, id} of post.gallery_data.items) {
+		for (const { media_id, id } of post.gallery_data.items) {
 			const media = post.media_metadata[media_id];
 			// s=highest quality (for some reason), u=URL
 			// URL contains &amp; instead of &
 			const downloadUrl = media['s']['u'].replaceAll('&amp;', '&');
-			const shortUrl = downloadUrl.split('?')[0]
-			const fileType = shortUrl.split('.').pop()
+			const shortUrl = downloadUrl.split('?')[0];
+			const fileType = shortUrl.split('.').pop();
 
 			// Create directory for gallery
 			const postDirectory = `${downloadDirectory}/${postTitleScrubbed}`;
@@ -725,11 +722,8 @@ async function downloadPost(post) {
 				fs.mkdirSync(postDirectory);
 			}
 			const filePath = `${postTitleScrubbed}/${id}.${fileType}`;
-			const toDownload = await shouldWeDownload(
-				post.subreddit,
-				filePath,
-			);
-			
+			const toDownload = await shouldWeDownload(post.subreddit, filePath);
+
 			if (!toDownload) {
 				if (--newDownloads === 0) {
 					downloadedPosts.skipped_due_to_duplicate += 1;
@@ -741,7 +735,7 @@ async function downloadPost(post) {
 				downloadMediaFile(
 					downloadUrl,
 					`${downloadDirectory}/${filePath}`,
-					post.name,	
+					post.name,
 				);
 			}
 		}
