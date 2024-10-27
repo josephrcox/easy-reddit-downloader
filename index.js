@@ -631,6 +631,7 @@ async function downloadFromPostListFile() {
 			}
 			downloadPost(post);
 		});
+		await sleep();
 	}
 }
 
