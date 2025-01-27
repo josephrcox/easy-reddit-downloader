@@ -11,6 +11,7 @@ export interface RedditPost {
   selftext?: string;
   over_18: boolean;
   domain?: string;
+  permalink: string;
   url_overridden_by_dest?: string;
   preview?: {
     reddit_video_preview?: {

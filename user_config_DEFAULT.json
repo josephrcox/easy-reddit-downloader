@@ -26,6 +26,7 @@
         "showAuthor": true,
         "showTitle": true,
         "showScore": true,
+        "showDate": false,
         "showSubreddit": true
     },
     "file_format_options": {

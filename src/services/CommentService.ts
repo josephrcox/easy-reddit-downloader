@@ -3,6 +3,7 @@ import { JSONcomment, CSVComment, PostComments } from "../types/output";
 import { LogService } from "./LogService";
 import { RuntimeConfig } from "../types/runtime";
 import { formatCommentsAsTree } from "../utils/commentTree";
+import { RedditPost } from "types/types";
 
 export class CommentService {
   private logger: LogService;
@@ -13,28 +14,39 @@ export class CommentService {
     this.logger = logger;
   }
 
-  public async fetchAndFormatComments(postUrl: string): Promise<string | null> {
+  public async fetchAndFormatComments(postPermalink: string, post: RedditPost): Promise<string | null> {
     if (!this.config.download_comments) {
       return null;
     }
 
+    const postUrl = `https://www.reddit.com${postPermalink}.json`;
+    console.log(postUrl);
+
     try {
-      const response = await axios.get(`${postUrl}.json`);
+      const response = await axios.get(postUrl);
       const comments = response.data[1].data.children;
+
+      let OriginalData: JSONcomment = {
+        user: post.author,
+        comment: `${post.title} | ${post.selftext !== "" ? post.selftext! : ""}`,
+        votes: post.score,
+        child: [],
+      };
 
       // First convert to our base JSON format
       const jsonComments = this.convertToJsonFormat(comments);
+      OriginalData.child = jsonComments;
 
       // Then convert to the specified format based on config
       switch (this.config.file_format_options.comment_format) {
         case "json":
-          return JSON.stringify(jsonComments, null, 2);
+          return JSON.stringify([OriginalData], null, 2);
         case "csv":
-          return this.convertToCSV(jsonComments);
+          return this.convertToCSV([OriginalData]);
         case "txt":
-          return this.convertToTxt(jsonComments);
+          return this.convertToTxt([OriginalData]);
         default:
-          return JSON.stringify(jsonComments, null, 2);
+          return JSON.stringify([OriginalData], null, 2);
       }
     } catch (error) {
       this.logger.log(`Failed to fetch comments for post: ${error}`, true);

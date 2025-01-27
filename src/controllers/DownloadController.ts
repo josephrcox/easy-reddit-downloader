@@ -47,6 +47,7 @@ export class DownloadController {
     this.logger.log(`Starting downloading for r/${subreddit}`, false);
     this.startTime = new Date();
     this.fileService.makeDirectories();
+    console.log(this.config);
 
     try {
       const limit = 25;
@@ -92,9 +93,10 @@ export class DownloadController {
       }
 
       // Handle next batch if needed
-      const shouldContinue = this.config.numberOfPosts === 0 
-        ? response.data.children.length === limit // If numberOfPosts is 0, continue until we get less than limit
-        : this.getPostsRemaining() > 0; // Otherwise check remaining posts
+      const shouldContinue =
+        this.config.numberOfPosts === 0
+          ? response.data.children.length === limit // If numberOfPosts is 0, continue until we get less than limit
+          : this.getPostsRemaining() > 0; // Otherwise check remaining posts
 
       if (response.data.children.length === limit && shouldContinue) {
         const lastPost = response.data.children[response.data.children.length - 1]!.data;
@@ -146,7 +148,7 @@ export class DownloadController {
       return;
     }
 
-    const filePath = `${downloadDir}/${fileName}.txt`;
+    const filePath = `${downloadDir}/${fileName}.${this.config.file_format_options.comment_format}`;
     if (!(await this.fileService.shouldDownloadFile(filePath))) {
       this.downloadedPosts.skipped_due_to_duplicate++;
       return;
@@ -168,23 +170,31 @@ export class DownloadController {
     }
 
     try {
-      const { downloadUrl, fileType } = await this.getMediaDownloadInfo(post);
-      const filePath = `${downloadDir}/${fileName}.${fileType}`;
+      if (!this.config.download_text_content_only) {
+        const { downloadUrl, fileType } = await this.getMediaDownloadInfo(post);
+        const filePath = `${downloadDir}/${fileName}.${fileType}`;
 
-      if (!(await this.fileService.shouldDownloadFile(filePath))) {
-        this.downloadedPosts.skipped_due_to_duplicate++;
-        return;
+        if (!(await this.fileService.shouldDownloadFile(filePath))) {
+          this.downloadedPosts.skipped_due_to_duplicate++;
+          return;
+        }
+
+        await this.redditService.downloadMediaFile(downloadUrl, filePath);
+        this.downloadedPosts.media++;
+      } else {
+        this.logger.log("Skipping media downloads due to config.");
       }
-
-      await this.redditService.downloadMediaFile(downloadUrl, filePath);
-      this.downloadedPosts.media++;
 
       // Download comments if enabled
       const comments = await this.getPostComments(post);
       if (comments) {
-        const commentFilePath = `${downloadDir}/${fileName}_comments.txt`;
-        const commentContent = `${post.title} by ${post.author}\n\n${comments}`;
+        const commentFilePath = `${downloadDir}/${fileName}_comments.${this.config.file_format_options.comment_format}`;
+        const commentContent =
+          this.config.file_format_options.comment_format === "txt" ? `${post.title} by ${post.author}\n\n${comments}` : comments;
         await this.fileService.writeFile(commentFilePath, commentContent);
+      } else if (!this.config.download_text_content_only) {
+        // Only increment skipped if we're not in text-only mode and no comments were downloaded
+        this.downloadedPosts.skipped_due_to_fileType++;
       }
     } catch (error) {
       throw new Error(`Failed to process media post: ${error}`);
@@ -197,36 +207,44 @@ export class DownloadController {
       return;
     }
 
-    const galleryDir = `${downloadDir}/${fileName}`;
-    if (!(await this.fileService.shouldDownloadFile(galleryDir))) {
-      this.downloadedPosts.skipped_due_to_duplicate++;
-      return;
-    }
-
     try {
-      // Create gallery directory
-      if (!fs.existsSync(galleryDir)) {
-        fs.mkdirSync(galleryDir, { recursive: true });
+      if (!this.config.download_text_content_only) {
+        const galleryDir = `${downloadDir}/${fileName}`;
+        if (!(await this.fileService.shouldDownloadFile(galleryDir))) {
+          this.downloadedPosts.skipped_due_to_duplicate++;
+          return;
+        }
+
+        // Create gallery directory
+        if (!fs.existsSync(galleryDir)) {
+          fs.mkdirSync(galleryDir, { recursive: true });
+        }
+
+        for (const { media_id, id } of post.gallery_data.items) {
+          const media = post.media_metadata[media_id];
+          if (!media?.s?.u) continue;
+
+          const downloadUrl = media.s.u.replaceAll("&amp;", "&");
+          const fileType = downloadUrl.split("?")[0]?.split(".").pop() || "jpg";
+          const filePath = `${galleryDir}/${id}.${fileType}`;
+
+          await this.redditService.downloadMediaFile(downloadUrl, filePath);
+        }
+        this.downloadedPosts.media++;
       }
-
-      for (const { media_id, id } of post.gallery_data.items) {
-        const media = post.media_metadata[media_id];
-        if (!media?.s?.u) continue;
-
-        const downloadUrl = media.s.u.replaceAll("&amp;", "&");
-        const fileType = downloadUrl.split("?")[0]?.split(".").pop() || "jpg";
-        const filePath = `${galleryDir}/${id}.${fileType}`;
-
-        await this.redditService.downloadMediaFile(downloadUrl, filePath);
-      }
-      this.downloadedPosts.media++;
 
       // Download comments if enabled
       const comments = await this.getPostComments(post);
       if (comments) {
-        const commentFilePath = `${galleryDir}/comments.txt`;
-        const commentContent = `${post.title} by ${post.author}\n\n${comments}`;
+        const commentFilePath = this.config.download_text_content_only
+          ? `${downloadDir}/${fileName}_comments.${this.config.file_format_options.comment_format}`
+          : `${downloadDir}/${fileName}/comments.${this.config.file_format_options.comment_format}`;
+        const commentContent =
+          this.config.file_format_options.comment_format === "txt" ? `${post.title} by ${post.author}\n\n${comments}` : comments;
         await this.fileService.writeFile(commentFilePath, commentContent);
+      } else if (!this.config.download_text_content_only) {
+        // Only increment skipped if we're not in text-only mode and no comments were downloaded
+        this.downloadedPosts.skipped_due_to_fileType++;
       }
     } catch (error) {
       throw new Error(`Failed to process gallery post: ${error}`);
@@ -239,27 +257,33 @@ export class DownloadController {
       return;
     }
 
-    const filePath = `${downloadDir}/${fileName}${post.domain?.includes("youtu") ? ".mp4" : ".html"}`;
-    if (!(await this.fileService.shouldDownloadFile(filePath))) {
-      this.downloadedPosts.skipped_due_to_duplicate++;
-      return;
-    }
-
     try {
-      if (post.domain?.includes("youtu") && this.config.download_youtube_videos_experimental) {
-        await this.redditService.downloadYouTubeVideo(post.url!, filePath);
-      } else {
-        const htmlContent = `<html><body><script type='text/javascript'>window.location.href = "${post.url}";</script></body></html>`;
-        await this.fileService.writeFile(filePath, htmlContent);
+      if (!this.config.download_text_content_only) {
+        const filePath = `${downloadDir}/${fileName}${post.domain?.includes("youtu") ? ".mp4" : ".html"}`;
+        if (!(await this.fileService.shouldDownloadFile(filePath))) {
+          this.downloadedPosts.skipped_due_to_duplicate++;
+          return;
+        }
+
+        if (post.domain?.includes("youtu") && this.config.download_youtube_videos_experimental) {
+          await this.redditService.downloadYouTubeVideo(post.url!, filePath);
+        } else {
+          const htmlContent = `<html><body><script type='text/javascript'>window.location.href = "${post.url}";</script></body></html>`;
+          await this.fileService.writeFile(filePath, htmlContent);
+        }
+        this.downloadedPosts.link++;
       }
-      this.downloadedPosts.link++;
 
       // Download comments if enabled
       const comments = await this.getPostComments(post);
       if (comments) {
-        const commentFilePath = `${downloadDir}/${fileName}_comments.txt`;
-        const commentContent = `${post.title} by ${post.author}\n\n${comments}`;
+        const commentFilePath = `${downloadDir}/${fileName}_comments.${this.config.file_format_options.comment_format}`;
+        const commentContent =
+          this.config.file_format_options.comment_format === "txt" ? `${post.title} by ${post.author}\n\n${comments}` : comments;
         await this.fileService.writeFile(commentFilePath, commentContent);
+      } else if (!this.config.download_text_content_only) {
+        // Only increment skipped if we're not in text-only mode and no comments were downloaded
+        this.downloadedPosts.skipped_due_to_fileType++;
       }
     } catch (error) {
       throw new Error(`Failed to process link post: ${error}`);
@@ -267,10 +291,12 @@ export class DownloadController {
   }
 
   private async formatSelfPostContent(post: RedditPost): Promise<string> {
-    let content = `${post.title} by ${post.author}\n\n`;
-    content += `${post.selftext}\n`;
-    content += "------------------------------------------------\n\n";
-
+    let content = "";
+    if (this.config.file_format_options.comment_format === "txt") {
+      content = `${post.title} by ${post.author}\n\n`;
+      content += `${post.selftext}\n`;
+      content += "------------------------------------------------\n\n";
+    }
     const comments = await this.getPostComments(post);
     if (comments) {
       content += comments;
@@ -280,7 +306,9 @@ export class DownloadController {
   }
 
   private async getPostComments(post: RedditPost): Promise<string | null> {
-    return this.commentService.fetchAndFormatComments(post.url);
+    const comments = this.commentService.fetchAndFormatComments(post.permalink, post);
+    this.logger.log(`Fetched comments for ${post.title}`, true);
+    return comments;
   }
 
   private async getMediaDownloadInfo(post: RedditPost): Promise<{ downloadUrl: string; fileType: string }> {
@@ -304,26 +332,26 @@ export class DownloadController {
     return { downloadUrl, fileType };
   }
 
-    private getPostsRemaining(): number {
-        // If numberOfPosts is 0, return a large number to ensure continuation
-        if (this.config.numberOfPosts === 0) {
-            return Number.MAX_SAFE_INTEGER;
-        }
-
-        // Get only numeric values from downloadedPosts
-        const numericValues = Object.entries(this.downloadedPosts)
-            .filter(([key, val]) => key !== 'subreddit' && typeof val === 'number')
-            .map(([_, val]) => val as number);
-
-        // If no posts have been downloaded yet, return the total number of posts to download
-        if (numericValues.every(val => val === 0)) {
-            return this.config.numberOfPosts;
-        }
-
-        // Calculate remaining posts based on what's been downloaded
-        const total = numericValues.reduce((sum, val) => sum + val, 0);
-        return this.config.numberOfPosts - total;
+  private getPostsRemaining(): number {
+    // If numberOfPosts is 0, return a large number to ensure continuation
+    if (this.config.numberOfPosts === 0) {
+      return Number.MAX_SAFE_INTEGER;
     }
+
+    // Get only numeric values from downloadedPosts
+    const numericValues = Object.entries(this.downloadedPosts)
+      .filter(([key, val]) => key !== "subreddit" && typeof val === "number")
+      .map(([_, val]) => val as number);
+
+    // If no posts have been downloaded yet, return the total number of posts to download
+    if (numericValues.every((val) => val === 0)) {
+      return this.config.numberOfPosts;
+    }
+
+    // Calculate remaining posts based on what's been downloaded
+    const total = numericValues.reduce((sum, val) => sum + val, 0);
+    return this.config.numberOfPosts - total;
+  }
 
   public getStats(): PostStats {
     return { ...this.downloadedPosts };
