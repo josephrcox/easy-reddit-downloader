@@ -136,5 +136,8 @@ testing_folder
 user_config.json
 reddit_post_downloader.code-workspace
 
+# examples
+examples
+
 .DS_Store
 .DS_Store

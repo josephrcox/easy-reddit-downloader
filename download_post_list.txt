@@ -1,4 +1,0 @@
-# Below, please list any posts that you wish to download. # 
-# They must follow this format below: # 
-# https://www.reddit.com/r/gadgets/comments/ptt967/eu_proposes_mandatory_usbc_on_all_devices/ # 
-# Lines with "#" at the start will be ignored (treated as comments). #

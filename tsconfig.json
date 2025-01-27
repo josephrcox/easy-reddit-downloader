@@ -1,0 +1,56 @@
+{
+  "compilerOptions": {
+    /* Language and Environment */
+    "target": "ES2021",
+    "lib": ["ES2021"],
+    "moduleResolution": "node",
+    
+    /* Modules */
+    "module": "CommonJS",
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "baseUrl": "./src",
+    "paths": {
+      "*": ["*"]
+    },
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    
+    /* JavaScript Support */
+    "allowJs": true,
+    "checkJs": true,
+    
+    /* Emit */
+    "sourceMap": true,
+    "removeComments": false,
+    "noEmitOnError": true,
+    
+    /* Type Checking */
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    
+    /* Interop Constraints */
+    "forceConsistentCasingInFileNames": true,
+    
+    /* Completeness */
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}

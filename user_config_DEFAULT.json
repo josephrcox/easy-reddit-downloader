@@ -1,7 +1,9 @@
 {
     "testingMode": false,
     "testingModeOptions": {
-        "subredditList": ["AskReddit","pics"],
+        "subredditList": [
+            "Balenciaga"
+        ],
         "numberOfPosts": 25,
         "sorting": "new",
         "time": "month",
@@ -32,7 +34,9 @@
     "download_gallery_posts": true,
     "download_youtube_videos_experimental": false,
     "download_comments": true,
+    "download_all_comments": true,
+    "download_text_content_only": true,
     "separate_clean_nsfw": false,
     "redownload_posts": false,
-    "detailed_logs": false
+    "detailed_logs": true
 }
