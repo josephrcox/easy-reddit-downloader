@@ -169,6 +169,14 @@ export class DownloadController {
 
       await this.redditService.downloadMediaFile(downloadUrl, filePath);
       this.downloadedPosts.media++;
+
+      // Download comments if enabled
+      const comments = await this.getPostComments(post);
+      if (comments) {
+        const commentFilePath = `${downloadDir}/${fileName}_comments.txt`;
+        const commentContent = `${post.title} by ${post.author}\n\n${comments}`;
+        await this.fileService.writeFile(commentFilePath, commentContent);
+      }
     } catch (error) {
       throw new Error(`Failed to process media post: ${error}`);
     }
@@ -203,6 +211,14 @@ export class DownloadController {
         await this.redditService.downloadMediaFile(downloadUrl, filePath);
       }
       this.downloadedPosts.media++;
+
+      // Download comments if enabled
+      const comments = await this.getPostComments(post);
+      if (comments) {
+        const commentFilePath = `${galleryDir}/comments.txt`;
+        const commentContent = `${post.title} by ${post.author}\n\n${comments}`;
+        await this.fileService.writeFile(commentFilePath, commentContent);
+      }
     } catch (error) {
       throw new Error(`Failed to process gallery post: ${error}`);
     }
@@ -228,6 +244,14 @@ export class DownloadController {
         await this.fileService.writeFile(filePath, htmlContent);
       }
       this.downloadedPosts.link++;
+
+      // Download comments if enabled
+      const comments = await this.getPostComments(post);
+      if (comments) {
+        const commentFilePath = `${downloadDir}/${fileName}_comments.txt`;
+        const commentContent = `${post.title} by ${post.author}\n\n${comments}`;
+        await this.fileService.writeFile(commentFilePath, commentContent);
+      }
     } catch (error) {
       throw new Error(`Failed to process link post: ${error}`);
     }
@@ -238,32 +262,44 @@ export class DownloadController {
     content += `${post.selftext}\n`;
     content += "------------------------------------------------\n\n";
 
-    if (this.config.download_comments) {
-      try {
-        const response = await axios.get(`${post.url}.json`);
-        const comments = response.data[1].data.children;
-        content += "--COMMENTS--\n\n";
-
-        for (const { data: comment } of comments) {
-          if (this.config.download_all_comments) {
-            content += this.processCommentThread(comment, 0);
-          } else {
-            content += `${comment.author}:\n${comment.body}\n`;
-            if (comment.replies && typeof comment.replies !== "string") {
-              const topReply = comment.replies.data.children[0]?.data;
-              if (topReply) {
-                content += `\t>\t${topReply.author}:\n\t>\t${topReply.body}\n`;
-              }
-            }
-          }
-          content += "\n\n\n";
-        }
-      } catch (error) {
-        this.logger.log(`Failed to fetch comments for post: ${error}`, true);
-      }
+    const comments = await this.getPostComments(post);
+    if (comments) {
+      content += comments;
     }
 
     return content;
+  }
+
+  private async getPostComments(post: RedditPost): Promise<string | null> {
+    if (!this.config.download_comments) {
+      return null;
+    }
+
+    try {
+      const response = await axios.get(`${post.url}.json`);
+      const comments = response.data[1].data.children;
+      let content = "--COMMENTS--\n\n";
+
+      for (const { data: comment } of comments) {
+        if (this.config.download_all_comments) {
+          content += this.processCommentThread(comment, 0);
+        } else {
+          content += `${comment.author}:\n${comment.body}\n`;
+          if (comment.replies && typeof comment.replies !== "string") {
+            const topReply = comment.replies.data.children[0]?.data;
+            if (topReply) {
+              content += `\t>\t${topReply.author}:\n\t>\t${topReply.body}\n`;
+            }
+          }
+        }
+        content += "\n\n\n";
+      }
+
+      return content;
+    } catch (error) {
+      this.logger.log(`Failed to fetch comments for post: ${error}`, true);
+      return null;
+    }
   }
 
   private processCommentThread(comment: any, depth: number): string {
