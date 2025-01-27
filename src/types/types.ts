@@ -1,6 +1,6 @@
 export interface RedditPost {
   title: string;
-  url?: string;
+  url: string;
   name: string;
   author: string;
   score: number;
