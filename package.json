@@ -9,17 +9,22 @@
     "dev": "tsc --watch",
     "clean": "rimraf dist",
     "prebuild": "yarn clean",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch"
   },
   "keywords": [],
   "author": "Joseph R. Cox",
   "license": "MIT",
   "devDependencies": {
     "@types/fluent-ffmpeg": "^2.1.24",
+    "@types/jest": "^29.5.14",
     "@types/node": "^20.11.0",
     "@types/prompts": "^2.4.9",
     "@types/request": "^2.48.12",
     "rimraf": "^5.0.5",
+    "string-width": "4.2.0",
+    "strip-ansi": "6.0.0",
+    "ts-jest": "^29.2.5",
     "typescript": "^5.7.3"
   },
   "dependencies": {
@@ -27,6 +32,7 @@
     "chalk": "^4.1.2",
     "child_process": "^1.0.2",
     "fluent-ffmpeg": "^2.1.2",
+    "jest": "^29.7.0",
     "prompts": "^2.4.2",
     "request": "^2.88.2",
     "ytdl-core": "^4.11.4"

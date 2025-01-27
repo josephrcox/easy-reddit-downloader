@@ -8,6 +8,7 @@ import { ConfigService } from "./services/ConfigService";
 import { FileService } from "./services/FileService";
 import { LogService } from "./services/LogService";
 import { RedditService } from "./services/RedditService";
+import { CommentService } from "./services/CommentService";
 import { DownloadController } from "./controllers/DownloadController";
 import { PromptController } from "./controllers/PromptController";
 
@@ -20,6 +21,7 @@ async function main() {
         const logger = configService.getLogger();
         const fileService = new FileService(configService.getRuntimeConfig(), logger);
         const redditService = new RedditService(configService.getRuntimeConfig(), logger);
+        const commentService = new CommentService(configService.getRuntimeConfig(), logger);
         
         // Initialize controllers
         const promptController = new PromptController(configService);
@@ -27,7 +29,8 @@ async function main() {
             configService.getRuntimeConfig(),
             logger,
             fileService,
-            redditService
+            redditService,
+            commentService
         );
 
         // Create necessary files
@@ -47,7 +50,8 @@ async function main() {
                 configService.getRuntimeConfig(),
                 logger,
                 fileService,
-                redditService
+                redditService,
+                commentService
             );
             // Get fresh config after prompt
             const updatedConfig = configService.getRuntimeConfig();

@@ -28,11 +28,15 @@
         "showScore": true,
         "showSubreddit": true
     },
+    "file_format_options": {
+        "comment_format": "json"
+    },
     "download_self_posts": true,
     "download_media_posts": true,
     "download_link_posts": true,
     "download_gallery_posts": true,
     "download_youtube_videos_experimental": false,
+    "download_images": false,
     "download_comments": true,
     "download_all_comments": true,
     "download_text_content_only": true,

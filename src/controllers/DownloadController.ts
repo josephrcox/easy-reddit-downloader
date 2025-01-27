@@ -2,8 +2,8 @@ import { RuntimeConfig } from "../types/runtime";
 import { LogService } from "../services/LogService";
 import { FileService } from "../services/FileService";
 import { RedditService } from "../services/RedditService";
+import { CommentService } from "../services/CommentService";
 import { PostStats, RedditPost } from "../types/types";
-import axios from "axios";
 import fs from "fs";
 
 export class DownloadController {
@@ -14,11 +14,20 @@ export class DownloadController {
   private downloadedPosts: PostStats;
   private startTime: Date | null = null;
 
-  constructor(config: RuntimeConfig, logger: LogService, fileService: FileService, redditService: RedditService) {
+  private commentService: CommentService;
+
+  constructor(
+    config: RuntimeConfig,
+    logger: LogService,
+    fileService: FileService,
+    redditService: RedditService,
+    commentService: CommentService
+  ) {
     this.config = config;
     this.logger = logger;
     this.fileService = fileService;
     this.redditService = redditService;
+    this.commentService = commentService;
     this.downloadedPosts = this.initializePostStats();
   }
 
@@ -271,48 +280,7 @@ export class DownloadController {
   }
 
   private async getPostComments(post: RedditPost): Promise<string | null> {
-    if (!this.config.download_comments) {
-      return null;
-    }
-
-    try {
-      const response = await axios.get(`${post.url}.json`);
-      const comments = response.data[1].data.children;
-      let content = "--COMMENTS--\n\n";
-
-      for (const { data: comment } of comments) {
-        if (this.config.download_all_comments) {
-          content += this.processCommentThread(comment, 0);
-        } else {
-          content += `${comment.author}:\n${comment.body}\n`;
-          if (comment.replies && typeof comment.replies !== "string") {
-            const topReply = comment.replies.data.children[0]?.data;
-            if (topReply) {
-              content += `\t>\t${topReply.author}:\n\t>\t${topReply.body}\n`;
-            }
-          }
-        }
-        content += "\n\n\n";
-      }
-
-      return content;
-    } catch (error) {
-      this.logger.log(`Failed to fetch comments for post: ${error}`, true);
-      return null;
-    }
-  }
-
-  private processCommentThread(comment: any, depth: number): string {
-    const indent = "\t>".repeat(depth) + "\t";
-    let result = `${indent}${comment.author}:\n${indent}${comment.body}\n`;
-
-    if (comment.replies && typeof comment.replies !== "string") {
-      comment.replies.data.children.forEach((child: any) => {
-        result += this.processCommentThread(child.data, depth + 1);
-      });
-    }
-
-    return result;
+    return this.commentService.fetchAndFormatComments(post.url);
   }
 
   private async getMediaDownloadInfo(post: RedditPost): Promise<{ downloadUrl: string; fileType: string }> {

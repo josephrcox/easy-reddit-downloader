@@ -30,6 +30,9 @@ export interface UserConfig {
     showDate: boolean;
     showSubreddit: boolean;
   };
+  file_format_options: {
+    comment_format: "json" | "txt" | "csv";
+  };
   download_self_posts: boolean;
   download_media_posts: boolean;
   download_link_posts: boolean;
