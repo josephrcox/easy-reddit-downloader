@@ -843,6 +843,60 @@ function sleep() {
     return new Promise((resolve) => setTimeout(resolve, postDelayMilliseconds));
 }
 
+// Helper: format date for metadata line
+function formatUtc(tsSeconds) {
+    const d = new Date((tsSeconds || 0) * 1000);
+    // ISO-like but more readable for humans
+    return isNaN(d.getTime()) ? 'N/A' : d.toISOString().replace('T', ' ').replace('Z', ' UTC');
+}
+
+// Helper: build Markdown for a self post (title, meta, body, comments)
+function buildSelfPostMarkdown(post, commentsListing, includeComments) {
+    const permalink =
+        post.permalink ? `https://www.reddit.com${post.permalink}` : post.url || '';
+    let md = '';
+
+    // Title
+    md += `# ${post.title || ''}\n\n`;
+
+    // Metadata as a simple list (avoid heavy bolding)
+    md += `- Author: u/${post.author}\n`;
+    md += `- Subreddit: r/${post.subreddit}\n`;
+    md += `- Score: ${post.score}\n`;
+    md += `- Created: ${formatUtc(post.created_utc || post.created)}\n`;
+    if (permalink) md += `- Permalink: ${permalink}\n`;
+    md += `\n---\n\n`;
+
+    // Body
+    md += `## Post\n\n`;
+    md += `${post.selftext || ''}\n\n`;
+
+    // Comments
+    if (includeComments) {
+        md += `---\n\n## Top comments\n\n`;
+        if (
+            commentsListing &&
+            commentsListing.data &&
+            Array.isArray(commentsListing.data.children)
+        ) {
+            commentsListing.data.children.forEach((child, idx) => {
+                if (!child || !child.data) return;
+                const c = child.data;
+                md += `u/${c.author}:\n\n${c.body || ''}\n\n`;
+                // First nested reply (one level)
+                if (c.replies && c.replies.data && c.replies.data.children && c.replies.data.children[0] && c.replies.data.children[0].data) {
+                    const r = c.replies.data.children[0].data;
+                    const replyBody = (r.body || '').replace(/\n/g, '\n> ');
+                    md += `> u/${r.author}:\n> ${replyBody}\n\n`;
+                }
+                md += `---\n\n`;
+            });
+        }
+    }
+
+    return md;
+}
+
 async function downloadPost(post) {
     let postTypeOptions = ['self', 'media', 'link', 'poll', 'gallery'];
     let postType = -1; // default to no postType until one is found
@@ -910,10 +964,10 @@ async function downloadPost(post) {
         postTitleScrubbed = getFileName(post);
 
         if (postType === 0) {
-            // DOWNLOAD A SELF POST
+            // DOWNLOAD A SELF POST (now Markdown)
             let toDownload = await shouldWeDownload(
                 post.subreddit,
-                `${postTitleScrubbed}.txt`,
+                `${postTitleScrubbed}.md`,
             );
             if (!toDownload) {
                 downloadedPosts.skipped_due_to_duplicate += 1;
@@ -924,8 +978,7 @@ async function downloadPost(post) {
                     downloadedPosts.skipped_due_to_fileType += 1;
                     return checkIfDone(post.name);
                 } else {
-                    // DOWNLOAD A SELF POST
-                    let comments_string = '';
+                    // Build Markdown with optional comments
                     let postResponse = null;
                     let data = null;
                     try {
@@ -936,34 +989,16 @@ async function downloadPost(post) {
                         return checkIfDone(post.name);
                     }
 
-                    // With text/self posts, we want to download the top comments as well.
-                    // This is done by requesting the post's JSON data, and then iterating through each comment.
-                    // We also iterate through the top nested comments (only one level deep).
-                    // So we have a file output with the post title, the post text, the author, and the top comments.
-
-                    comments_string += post.title + ' by ' + post.author + '\n\n';
-                    comments_string += post.selftext + '\n';
-                    comments_string +=
-                        '------------------------------------------------\n\n';
-                    if (config.download_comments) {
-                        // If the user wants to download comments
-                        comments_string += '--COMMENTS--\n\n';
-                        data[1].data.children.forEach((child) => {
-                            const comment = child.data;
-                            comments_string += comment.author + ':\n';
-                            comments_string += comment.body + '\n';
-                            if (comment.replies) {
-                                const top_reply = comment.replies.data.children[0].data;
-                                comments_string += '\t>\t' + top_reply.author + ':\n';
-                                comments_string += '\t>\t' + top_reply.body + '\n';
-                            }
-                            comments_string += '\n\n\n';
-                        });
-                    }
+                    const commentsListing = data && data[1];
+                    const markdown = buildSelfPostMarkdown(
+                        post,
+                        commentsListing,
+                        !!config.download_comments,
+                    );
 
                     fs.writeFile(
-                        `${downloadDirectory}/${postTitleScrubbed}.txt`,
-                        comments_string,
+                        `${downloadDirectory}/${postTitleScrubbed}.md`,
+                        markdown,
                         function (err) {
                             if (err) {
                                 log(err, true);
