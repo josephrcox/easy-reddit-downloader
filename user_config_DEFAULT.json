@@ -1,7 +1,7 @@
 {
     "testingMode": false,
     "testingModeOptions": {
-        "subredditList": ["AskReddit","pics"],
+        "subredditList": ["AskReddit", "pics"],
         "numberOfPosts": 25,
         "sorting": "new",
         "time": "month",
@@ -34,5 +34,6 @@
     "download_comments": true,
     "separate_clean_nsfw": false,
     "redownload_posts": false,
-    "detailed_logs": false
+    "detailed_logs": false,
+    "download_redgifs_videos": true
 }

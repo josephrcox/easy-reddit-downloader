@@ -138,3 +138,5 @@ reddit_post_downloader.code-workspace
 
 .DS_Store
 .DS_Store
+/.idea/
+/easy-reddit-downloader.iml
