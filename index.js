@@ -333,6 +333,13 @@ async function downloadSubredditPosts(subreddit, lastPostId) {
 		subreddit = subreddit.split('u/').pop();
 		return downloadUser(subreddit, lastPostId);
 	}
+	if (
+		subreddit.startsWith('search:')
+	) {
+		isSearch = true;
+		subreddit = subreddit.split('search:').pop();
+		return downloadSearch(subreddit, lastPostId);
+	}
 	let postsRemaining = numberOfPostsRemaining()[0];
 	if (postsRemaining <= 0) {
 		// If we have downloaded enough posts, move on to the next subreddit
@@ -562,6 +569,99 @@ async function downloadUser(user, currentUserAfter) {
 	}
 }
 
+async function downloadSearch(query, lastPostId) {
+	let postsRemaining = numberOfPostsRemaining()[0];
+	if (postsRemaining <= 0) {
+		// If we have downloaded enough posts, move on to the next subreddit
+		if (subredditList.length > 1) {
+			return downloadNextSubreddit();
+		} else {
+			// If we have downloaded all the subreddits, end the program
+			return checkIfDone('', true);
+		}
+		return;
+	} else if (postsRemaining > 100) {
+		// If we have more posts to download than the limit of 100, set it to 100
+		postsRemaining = 100;
+	}
+
+	// if lastPostId is undefined, set it to an empty string. Common on first run.
+	if (lastPostId == undefined) {
+		lastPostId = '';
+	}
+	makeDirectories();
+
+	try {
+		let searchTerms = query.replaceAll(" ", "+").replaceAll(":", "%3A");  // Remove spaces and colons
+		// Get posts, sorted by new, and include over 18 in case the nsfw:yes flag is set
+		let reqUrl = `https://www.reddit.com/search/.json?q=${searchTerms}&type=posts&sort=new&include_over_18=on`;
+		log(
+			`\n\n👀 Requesting posts from
+			${reqUrl}\n`,
+			false,
+		);
+
+		let response = null;
+		let data = null;
+
+		try {
+			response = await axios.get(`${reqUrl}`);
+
+			data = await response.data;
+			currentUserAfter = data.data.after;
+
+			currentAPICall = data;
+			if (data.message == 'Not Found' || data.data.children.length == 0) {
+				throw error;
+			}
+			if (data.data.children.length < postsRemaining) {
+				lastAPICallForSubreddit = true;
+				postsRemaining = data.data.children.length;
+			} else {
+				lastAPICallForSubreddit = false;
+			}
+		} catch (err) {
+			log(
+				`\n\nERROR: There was a problem fetching posts for ${query}. This is likely because the subreddit is private, banned, or doesn't exist.`,
+				true,
+			);
+			if (subredditList.length > 1) {
+				if (currentSubredditIndex > subredditList.length - 1) {
+					currentSubredditIndex = -1;
+				}
+				currentSubredditIndex += 1;
+				return downloadSubredditPosts(subredditList[currentSubredditIndex], '');
+			} else {
+				return checkIfDone('', true);
+			}
+		}
+
+		downloadDirectory =
+			downloadDirectoryBase + `/search_${query.replace(" ", "_")}`;
+		
+		// Make sure the image directory exists
+		// If no directory is found, create one
+		if (!fs.existsSync(downloadDirectory)) {
+			fs.mkdirSync(downloadDirectory);
+		}
+
+		responseSize = data.data.children.length;
+
+		for (const child of data.data.children) {
+			await sleep();
+			try {
+				const post = child.data;
+				await downloadPost(post); // Make sure to await this as well
+			} catch (e) {
+				log(e, true);
+			}
+		}
+	} catch (err) {
+		// throw the error
+		throw error;
+	}
+}
+
 async function downloadFromPostListFile() {
 	// this is called when config.download_from_post_list_file is true
 	// this will read the download_post_list.txt file and download all the posts in it
@@ -763,6 +863,12 @@ async function downloadPost(post) {
 		}
 	} else if (postType != 3 && post.url !== undefined) {
 		let downloadURL = post.url;
+		// reddituploads is no more. Grab the preview image instead
+		if (downloadURL.includes("i.reddituploads.com")) {
+			let previewURL = post.preview.images[0].source.url;
+			// Fix the ampersands in the URL
+			downloadURL = previewURL.replaceAll('&amp;', '&');
+		}
 		// Get the file type of the post via the URL. If it ends in .jpg, then it's a jpg.
 		let fileType = downloadURL.split('.').pop();
 		// Post titles can be really long and have invalid characters, so we need to clean them up.
