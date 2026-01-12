@@ -1,6 +1,6 @@
 {
   "name": "easy-reddit-downloader",
-  "version": "v0.3.2",
+  "version": "v1.0.0",
   "description": "",
   "main": "script.js",
   "scripts": {
