@@ -5,7 +5,11 @@
   "main": "script.js",
   "scripts": {
     "start": "node index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest",
+    "test:unit": "jest --selectProjects unit",
+    "test:e2e": "jest --selectProjects e2e",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "keywords": [],
   "author": "Joseph R. Cox",
@@ -13,10 +17,12 @@
   "dependencies": {
     "axios": "^1.6.0",
     "chalk": "^4.1.2",
-    "child_process": "^1.0.2",
     "fluent-ffmpeg": "^2.1.2",
     "prompts": "^2.4.2",
-    "request": "^2.88.2",
     "ytdl-core": "^4.11.4"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "axios-mock-adapter": "^1.22.0"
   }
 }

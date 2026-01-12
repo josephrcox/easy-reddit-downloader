@@ -1,11 +1,17 @@
-const request = require('request');
 const { version } = require('./package.json');
 
 // NodeJS Dependencies
 const fs = require('fs');
+const fsp = fs.promises;
 const prompts = require('prompts');
 const chalk = require('chalk');
 const axios = require('axios');
+
+// Constants
+const MAX_POSTS_PER_REQUEST = 100;
+const MAX_FILENAME_LENGTH = 240;
+const ALL_POSTS = Number.MAX_SAFE_INTEGER;
+const DEFAULT_REQUEST_TIMEOUT = 30000; // 30 seconds
 
 const ytdl = require('ytdl-core');
 const ffmpeg = require('fluent-ffmpeg');
@@ -54,30 +60,22 @@ let downloadedPosts = {
 // Read the user_config.json file for user configuration options
 if (fs.existsSync('./user_config.json')) {
 	config = require('./user_config.json');
-	checkConfig();
 } else {
 	// create ./user_config.json if it doesn't exist, by duplicating user_config_DEFAULT.json and renaming it
-	fs.copyFile('./user_config_DEFAULT.json', './user_config.json', (err) => {
-		if (err) throw err;
-		log('user_config.json was created. Edit it to manage user options.', true);
-		config = require('./user_config.json');
-	});
-	checkConfig();
+	fs.copyFileSync('./user_config_DEFAULT.json', './user_config.json');
+	log('user_config.json was created. Edit it to manage user options.', true);
+	config = require('./user_config.json');
 }
+checkConfig();
 
 // check if download_post_list.txt exists, if it doesn't, create it
 if (!fs.existsSync('./download_post_list.txt')) {
-	fs.writeFile('./download_post_list.txt', '', (err) => {
-		if (err) throw err;
-
-		let fileDefaultContent = `# Below, please list any posts that you wish to download. # \n# They must follow this format below: # \n# https://www.reddit.com/r/gadgets/comments/ptt967/eu_proposes_mandatory_usbc_on_all_devices/ # \n# Lines with "#" at the start will be ignored (treated as comments). #`;
-
-		// write a few lines to the file
-		fs.appendFile('./download_post_list.txt', fileDefaultContent, (err) => {
-			if (err) throw err;
-			log('download_post_list.txt was created with default content.', true);
-		});
-	});
+	const fileDefaultContent = `# Below, please list any posts that you wish to download. #
+# They must follow this format below: #
+# https://www.reddit.com/r/gadgets/comments/ptt967/eu_proposes_mandatory_usbc_on_all_devices/ #
+# Lines with "#" at the start will be ignored (treated as comments). #`;
+	fs.writeFileSync('./download_post_list.txt', fileDefaultContent);
+	log('download_post_list.txt was created with default content.', true);
 }
 
 // Testing Mode for developer testing. This enables you to hardcode
@@ -166,31 +164,31 @@ function checkConfig() {
 }
 
 // Make a GET request to the GitHub API to get the latest release
-request.get(
-	'https://api.github.com/repos/josephrcox/easy-reddit-downloader/releases/latest',
-	{ headers: { 'User-Agent': 'Downloader' } },
-	(error, response, body) => {
-		if (error) {
-			log(error, true);
-		} else {
-			// Parse the re∏sponse body to get the version number of the latest release
-			const latestRelease = JSON.parse(body);
-			const latestVersion = latestRelease.tag_name;
+(async () => {
+	try {
+		const response = await axios.get(
+			'https://api.github.com/repos/josephrcox/easy-reddit-downloader/releases/latest',
+			{
+				headers: { 'User-Agent': 'Downloader' },
+				timeout: DEFAULT_REQUEST_TIMEOUT,
+			},
+		);
+		const latestVersion = response.data.tag_name;
 
-			// Compare the current version to the latest release version
-			if (version !== latestVersion) {
-				log(
-					`Hey! A new version (${latestVersion}) is available. \nConsider updating to the latest version with 'git pull'.\n`,
-					false,
-				);
-				startScript();
-			} else {
-				log('You are on the latest stable version (' + version + ')\n', true);
-				startScript();
-			}
+		// Compare the current version to the latest release version
+		if (version !== latestVersion) {
+			log(
+				`Hey! A new version (${latestVersion}) is available. \nConsider updating to the latest version with 'git pull'.\n`,
+				false,
+			);
+		} else {
+			log('You are on the latest stable version (' + version + ')\n', true);
 		}
-	},
-);
+	} catch (error) {
+		log('Could not check for updates: ' + error.message, true);
+	}
+	startScript();
+})();
 
 function startScript() {
 	if (!testingMode && !config.download_post_list_options.enabled) {
@@ -263,7 +261,7 @@ async function startPrompt() {
 			inactive: 'no',
 		},
 		{
-			type: (prev) => (prev == true ? 'number' : null),
+			type: (prev) => (prev === true ? 'number' : null),
 			name: 'timeBetweenRuns',
 			message: 'How often would you like to run this? (in ms)',
 		},
@@ -291,7 +289,7 @@ async function startPrompt() {
 	}
 
 	if (numberOfPosts === 0) {
-		numberOfPosts = 9999999999999999999999;
+		numberOfPosts = ALL_POSTS;
 	}
 
 	if (repeatForever) {
@@ -322,267 +320,140 @@ function makeDirectories() {
 	}
 }
 
-async function downloadSubredditPosts(subreddit, lastPostId) {
-	let isUser = false;
-	if (
-		subreddit.includes('u/') ||
-		subreddit.includes('user/') ||
-		subreddit.includes('/u/')
-	) {
-		isUser = true;
-		subreddit = subreddit.split('u/').pop();
-		return downloadUser(subreddit, lastPostId);
-	}
+/**
+ * Downloads posts from a subreddit or user profile
+ * @param {string} target - Subreddit name or username (with u/ prefix for users)
+ * @param {string} lastPostId - ID of last post for pagination, empty string for first request
+ */
+async function downloadSubredditPosts(target, lastPostId = '') {
+	// Check if target is a user profile
+	const isUser =
+		target.includes('u/') || target.includes('user/') || target.includes('/u/');
+
+	// Extract clean name
+	const name = isUser ? target.split('u/').pop() : target;
+
+	// Check if we've downloaded enough posts
 	let postsRemaining = numberOfPostsRemaining()[0];
 	if (postsRemaining <= 0) {
-		// If we have downloaded enough posts, move on to the next subreddit
 		if (subredditList.length > 1) {
 			return downloadNextSubreddit();
-		} else {
-			// If we have downloaded all the subreddits, end the program
-			return checkIfDone('', true);
 		}
-		return;
-	} else if (postsRemaining > 100) {
-		// If we have more posts to download than the limit of 100, set it to 100
-		postsRemaining = 100;
+		return checkIfDone('', true);
 	}
 
-	// if lastPostId is undefined, set it to an empty string. Common on first run.
-	if (lastPostId == undefined) {
-		lastPostId = '';
+	// Cap at API limit
+	if (postsRemaining > MAX_POSTS_PER_REQUEST) {
+		postsRemaining = MAX_POSTS_PER_REQUEST;
 	}
+
+	// Handle undefined target
+	if (name === undefined) {
+		if (subredditList.length > 1) {
+			return downloadNextSubreddit();
+		}
+		return checkIfDone();
+	}
+
 	makeDirectories();
 
+	// Build the appropriate URL
+	const reqUrl = isUser
+		? `https://www.reddit.com/user/${name}/submitted/.json?limit=${postsRemaining}&after=${lastPostId}`
+		: `https://www.reddit.com/r/${name}/${sorting}/.json?sort=${sorting}&t=${time}&limit=${postsRemaining}&after=${lastPostId}`;
+
+	log(`\n\n👀 Requesting posts from ${reqUrl}\n`, true);
+
 	try {
-		if (subreddit == undefined) {
-			if (subredditList.length > 1) {
-				return downloadNextSubreddit();
-			} else {
-				return checkIfDone();
-			}
+		const response = await axios.get(reqUrl, {
+			timeout: DEFAULT_REQUEST_TIMEOUT,
+		});
+		const data = response.data;
+
+		currentAPICall = data;
+
+		if (data.message === 'Not Found' || data.data.children.length === 0) {
+			throw new Error(
+				isUser
+					? 'User not found or has no posts'
+					: 'Subreddit not found or empty',
+			);
 		}
 
-		// Use log function to log a string
-		// as well as a boolean if the log should be displayed to the user.
+		// Check if this is the last batch of posts
+		if (data.data.children.length < postsRemaining) {
+			lastAPICallForSubreddit = true;
+			postsRemaining = data.data.children.length;
+		} else {
+			lastAPICallForSubreddit = false;
+		}
+
+		// Set up download directory
+		const firstPost = data.data.children[0].data;
+		downloadedPosts.subreddit = firstPost.subreddit;
+
 		if (isUser) {
-			log(
-				`\n\n👀 Requesting posts from
-				https://www.reddit.com/user/${subreddit.replace(
-					'u/',
-					'',
-				)}/${sorting}/.json?sort=${sorting}&t=${time}&limit=${postsRemaining}&after=${lastPostId}\n`,
-				true,
-			);
+			downloadDirectory = `${downloadDirectoryBase}/user_${name}`;
 		} else {
-			log(
-				`\n\n👀 Requesting posts from
-			https://www.reddit.com/r/${subreddit}/${sorting}/.json?sort=${sorting}&t=${time}&limit=${postsRemaining}&after=${lastPostId}\n`,
-				true,
-			);
+			const isOver18 = firstPost.over_18 ? 'nsfw' : 'clean';
+			downloadDirectory = config.separate_clean_nsfw
+				? `${downloadDirectoryBase}/${isOver18}/${firstPost.subreddit}`
+				: `${downloadDirectoryBase}/${firstPost.subreddit}`;
 		}
 
-		// Get the top posts from the subreddit
-		let response = null;
-		let data = null;
-
-		try {
-			response = await axios.get(
-				`https://www.reddit.com/r/${subreddit}/${sorting}/.json?sort=${sorting}&t=${time}&limit=${postsRemaining}&after=${lastPostId}`,
-			);
-
-			data = await response.data;
-
-			currentAPICall = data;
-			if (data.message == 'Not Found' || data.data.children.length == 0) {
-				throw error;
-			}
-			if (data.data.children.length < postsRemaining) {
-				lastAPICallForSubreddit = true;
-				postsRemaining = data.data.children.length;
-			} else {
-				lastAPICallForSubreddit = false;
-			}
-		} catch (err) {
-			log(
-				`\n\nERROR: There was a problem fetching posts for ${subreddit}. This is likely because the subreddit is private, banned, or doesn't exist.`,
-				true,
-			);
-			if (subredditList.length > 1) {
-				if (currentSubredditIndex > subredditList.length - 1) {
-					currentSubredditIndex = -1;
-				}
-				currentSubredditIndex += 1;
-				return downloadSubredditPosts(subredditList[currentSubredditIndex], '');
-			} else {
-				return checkIfDone('', true);
-			}
-		}
-
-		// if the first post on the subreddit is NSFW, then there is a fair chance
-		// that the rest of the posts are NSFW.
-		let isOver18 = data.data.children[0].data.over_18 ? 'nsfw' : 'clean';
-		downloadedPosts.subreddit = data.data.children[0].data.subreddit;
-
-		if (!config.separate_clean_nsfw) {
-			downloadDirectory =
-				downloadDirectoryBase + `/${data.data.children[0].data.subreddit}`;
-		} else {
-			downloadDirectory =
-				downloadDirectoryBase +
-				`/${isOver18}/${data.data.children[0].data.subreddit}`;
-		}
-
-		// Make sure the image directory exists
-		// If no directory is found, create one
+		// Create directory if it doesn't exist
 		if (!fs.existsSync(downloadDirectory)) {
 			fs.mkdirSync(downloadDirectory);
 		}
 
 		responseSize = data.data.children.length;
 
+		// Download each post
 		for (const child of data.data.children) {
 			await sleep();
 			try {
-				const post = child.data;
-				await downloadPost(post); // Make sure to await this as well
+				await downloadPost(child.data);
 			} catch (e) {
 				log(e, true);
 			}
 		}
-	} catch (error) {
-		// throw the error
-		throw error;
-	}
-}
-
-async function downloadUser(user, currentUserAfter) {
-	let lastPostId = currentUserAfter;
-	let postsRemaining = numberOfPostsRemaining()[0];
-	if (postsRemaining <= 0) {
-		// If we have downloaded enough posts, move on to the next subreddit
-		if (subredditList.length > 1) {
-			return downloadNextSubreddit();
-		} else {
-			// If we have downloaded all the subreddits, end the program
-			return checkIfDone('', true);
-		}
-		return;
-	} else if (postsRemaining > 100) {
-		// If we have more posts to download than the limit of 100, set it to 100
-		postsRemaining = 100;
-	}
-
-	// if lastPostId is undefined, set it to an empty string. Common on first run.
-	if (lastPostId == undefined) {
-		lastPostId = '';
-	}
-	makeDirectories();
-
-	try {
-		if (user == undefined) {
-			if (subredditList.length > 1) {
-				return downloadNextSubreddit();
-			} else {
-				return checkIfDone();
-			}
-		}
-
-		// Use log function to log a string
-		// as well as a boolean if the log should be displayed to the user.
-		let reqUrl = `https://www.reddit.com/user/${user.replace(
-			'u/',
-			'',
-		)}/submitted/.json?limit=${postsRemaining}&after=${lastPostId}`;
+	} catch (err) {
+		const entityType = isUser ? 'user' : 'subreddit';
 		log(
-			`\n\n👀 Requesting posts from
-			${reqUrl}\n`,
-			false,
+			`\n\nERROR: There was a problem fetching posts for ${name}. This is likely because the ${entityType} is private, banned, or doesn't exist.`,
+			true,
 		);
 
-		// Get the top posts from the subreddit
-		let response = null;
-		let data = null;
-
-		try {
-			response = await axios.get(`${reqUrl}`);
-
-			data = await response.data;
-			currentUserAfter = data.data.after;
-
-			currentAPICall = data;
-			if (data.message == 'Not Found' || data.data.children.length == 0) {
-				throw error;
+		// Try next subreddit/user or finish
+		if (subredditList.length > 1) {
+			if (currentSubredditIndex > subredditList.length - 1) {
+				currentSubredditIndex = -1;
 			}
-			if (data.data.children.length < postsRemaining) {
-				lastAPICallForSubreddit = true;
-				postsRemaining = data.data.children.length;
-			} else {
-				lastAPICallForSubreddit = false;
-			}
-		} catch (err) {
-			log(
-				`\n\nERROR: There was a problem fetching posts for ${user}. This is likely because the subreddit is private, banned, or doesn't exist.`,
-				true,
-			);
-			if (subredditList.length > 1) {
-				if (currentSubredditIndex > subredditList.length - 1) {
-					currentSubredditIndex = -1;
-				}
-				currentSubredditIndex += 1;
-				return downloadSubredditPosts(subredditList[currentSubredditIndex], '');
-			} else {
-				return checkIfDone('', true);
-			}
+			currentSubredditIndex += 1;
+			return downloadSubredditPosts(subredditList[currentSubredditIndex], '');
 		}
-
-		downloadDirectory =
-			downloadDirectoryBase + `/user_${user.replace('u/', '')}`;
-
-		// Make sure the image directory exists
-		// If no directory is found, create one
-		if (!fs.existsSync(downloadDirectory)) {
-			fs.mkdirSync(downloadDirectory);
-		}
-
-		responseSize = data.data.children.length;
-
-		for (const child of data.data.children) {
-			await sleep();
-			try {
-				const post = child.data;
-				await downloadPost(post); // Make sure to await this as well
-			} catch (e) {
-				log(e, true);
-			}
-		}
-	} catch (error) {
-		// throw the error
-		throw error;
+		return checkIfDone('', true);
 	}
 }
 
 async function downloadFromPostListFile() {
-	// this is called when config.download_from_post_list_file is true
-	// this will read the download_post_list.txt file and download all the posts in it
-	// downloading skips any lines starting with "#" as they are used for documentation
+	// This is called when config.download_post_list_options.enabled is true
+	// Reads download_post_list.txt and downloads all valid posts
+	// Lines starting with "#" are treated as comments and ignored
 
-	// read the file
-	let file = fs.readFileSync('./download_post_list.txt', 'utf8');
-	// split the file into an array of lines
-	let lines = file.split('\n');
-	// remove any lines that start with "#"
-	lines = lines.filter((line) => !line.startsWith('#'));
-	// remove any empty lines
-	lines = lines.filter((line) => line != '');
-	// remove any lines that are just whitespace
-	lines = lines.filter((line) => line.trim() != '');
-	// remove any lines that don't start with "https://www.reddit.com"
-	lines = lines.filter((line) => line.startsWith('https://www.reddit.com'));
-	// remove any lines that don't have "/comments/" in them
-	lines = lines.filter((line) => line.includes('/comments/'));
+	const file = fs.readFileSync('./download_post_list.txt', 'utf8');
+	const lines = file
+		.split('\n')
+		.map((line) => line.trim())
+		.filter(
+			(line) =>
+				line &&
+				!line.startsWith('#') &&
+				line.startsWith('https://www.reddit.com') &&
+				line.includes('/comments/'),
+		);
+
 	numberOfPosts = lines.length;
-
 	repeatForever = config.download_post_list_options.repeatForever;
 	timeBetweenRuns = config.download_post_list_options.timeBetweenRuns;
 
@@ -606,14 +477,17 @@ async function downloadFromPostListFile() {
 		chalk.green(
 			`Starting download of ${numberOfPosts} posts from the download_post_list.txt file.\n`,
 		),
+		false,
 	);
-	// iterate over the lines and download the posts
-	for (let i = 0; i < lines.length; i++) {
-		const line = lines[i];
-		const reqUrl = line + '.json';
-		axios.get(reqUrl).then(async (response) => {
+
+	// Download posts sequentially to avoid race conditions
+	for (const line of lines) {
+		try {
+			const response = await axios.get(line + '.json', {
+				timeout: DEFAULT_REQUEST_TIMEOUT,
+			});
 			const post = response.data[0].data.children[0].data;
-			let isOver18 = post.over_18 ? 'nsfw' : 'clean';
+			const isOver18 = post.over_18 ? 'nsfw' : 'clean';
 			downloadedPosts.subreddit = post.subreddit;
 			makeDirectories();
 
@@ -625,17 +499,22 @@ async function downloadFromPostListFile() {
 			}
 
 			// Make sure the image directory exists
-			// If no directory is found, create one
 			if (!fs.existsSync(downloadDirectory)) {
 				fs.mkdirSync(downloadDirectory);
 			}
-			downloadPost(post);
-		});
+			await downloadPost(post);
+			await sleep();
+		} catch (err) {
+			log(`Failed to download post from ${line}: ${err.message}`, true);
+			downloadedPosts.failed += 1;
+		}
 	}
+	checkIfDone('', true);
 }
 
 function getPostType(post, postTypeOptions) {
 	log(`Analyzing post with title: ${post.title}) and URL: ${post.url}`, true);
+	let postType;
 	if (post.post_hint === 'self' || post.is_self) {
 		postType = 0;
 	} else if (
@@ -649,7 +528,7 @@ function getPostType(post, postTypeOptions) {
 		post.domain.includes('i.reddituploads.com')
 	) {
 		postType = 1;
-	} else if (post.poll_data != undefined) {
+	} else if (post.poll_data !== undefined) {
 		postType = 3; // UNSUPPORTED
 	} else if (post.domain.includes('reddit.com') && post.is_gallery) {
 		postType = 4;
@@ -702,338 +581,315 @@ function sleep() {
 	return new Promise((resolve) => setTimeout(resolve, postDelayMilliseconds));
 }
 
-async function downloadPost(post) {
-	let postTypeOptions = ['self', 'media', 'link', 'poll', 'gallery'];
-	let postType = -1; // default to no postType until one is found
+// Supported image and video formats
+const MEDIA_FORMATS = ['jpeg', 'jpg', 'gif', 'png', 'mp4', 'webm', 'gifv'];
 
-	// Determine the type of post. If no type is found, default to link as a last resort.
-	// If it accidentally downloads a self or media post as a link, it will still
-	// save properly.
-	postType = getPostType(post, postTypeOptions);
+/**
+ * Downloads a gallery post (multiple images in one post)
+ */
+async function downloadGalleryPost(post, postTitleScrubbed) {
+	if (!config.download_gallery_posts) {
+		log(`Skipping gallery post with title: ${post.title}`, true);
+		downloadedPosts.skipped_due_to_fileType += 1;
+		return checkIfDone(post.name);
+	}
 
-	// Array of possible (supported) image and video formats
-	const imageFormats = ['jpeg', 'jpg', 'gif', 'png', 'mp4', 'webm', 'gifv'];
+	let newDownloads = Object.keys(post.media_metadata).length;
 
-	// All posts should have URLs, so just make sure that it does.
-	// If the post doesn't have a URL, then it should be skipped.
-	if (postType == 4) {
-		// Don't download the gallery if we don't want to
-		if (!config.download_gallery_posts) {
-			log(`Skipping gallery post with title: ${post.title}`, true);
-			downloadedPosts.skipped_due_to_fileType += 1;
-			return checkIfDone(post.name);
+	for (const { media_id, id } of post.gallery_data.items) {
+		const media = post.media_metadata[media_id];
+		const downloadUrl = media['s']['u'].replaceAll('&amp;', '&');
+		const shortUrl = downloadUrl.split('?')[0];
+		const fileType = shortUrl.split('.').pop();
+
+		// Create directory for gallery
+		const postDirectory = `${downloadDirectory}/${postTitleScrubbed}`;
+		if (!fs.existsSync(postDirectory)) {
+			fs.mkdirSync(postDirectory);
 		}
 
-		// The title will be the directory name
-		const postTitleScrubbed = getFileName(post);
-		let newDownloads = Object.keys(post.media_metadata).length;
-		// gallery_data retains the order of the gallery, so we loop over this
-		// media_id can be used as the key in media_metadata
-		for (const { media_id, id } of post.gallery_data.items) {
-			const media = post.media_metadata[media_id];
-			// s=highest quality (for some reason), u=URL
-			// URL contains &amp; instead of &
-			const downloadUrl = media['s']['u'].replaceAll('&amp;', '&');
-			const shortUrl = downloadUrl.split('?')[0];
-			const fileType = shortUrl.split('.').pop();
+		const filePath = `${postTitleScrubbed}/${id}.${fileType}`;
+		const toDownload = await shouldWeDownload(post.subreddit, filePath);
 
-			// Create directory for gallery
-			const postDirectory = `${downloadDirectory}/${postTitleScrubbed}`;
-			if (!fs.existsSync(postDirectory)) {
-				fs.mkdirSync(postDirectory);
-			}
-			const filePath = `${postTitleScrubbed}/${id}.${fileType}`;
-			const toDownload = await shouldWeDownload(post.subreddit, filePath);
-
-			if (!toDownload) {
-				if (--newDownloads === 0) {
-					downloadedPosts.skipped_due_to_duplicate += 1;
-					if (checkIfDone(post.name)) {
-						return;
-					}
-				}
-			} else {
-				downloadMediaFile(
-					downloadUrl,
-					`${downloadDirectory}/${filePath}`,
-					post.name,
-				);
-			}
-		}
-	} else if (postType != 3 && post.url !== undefined) {
-		let downloadURL = post.url;
-		// Get the file type of the post via the URL. If it ends in .jpg, then it's a jpg.
-		let fileType = downloadURL.split('.').pop();
-		// Post titles can be really long and have invalid characters, so we need to clean them up.
-		let postTitleScrubbed = sanitizeFileName(post.title);
-		postTitleScrubbed = getFileName(post);
-
-		if (postType === 0) {
-			// DOWNLOAD A SELF POST
-			let toDownload = await shouldWeDownload(
-				post.subreddit,
-				`${postTitleScrubbed}.txt`,
-			);
-			if (!toDownload) {
+		if (!toDownload) {
+			if (--newDownloads === 0) {
 				downloadedPosts.skipped_due_to_duplicate += 1;
 				return checkIfDone(post.name);
-			} else {
-				if (!config.download_self_posts) {
-					log(`Skipping self post with title: ${post.title}`, true);
-					downloadedPosts.skipped_due_to_fileType += 1;
-					return checkIfDone(post.name);
-				} else {
-					// DOWNLOAD A SELF POST
-					let comments_string = '';
-					let postResponse = null;
-					let data = null;
-					try {
-						postResponse = await axios.get(`${post.url}.json`);
-						data = postResponse.data;
-					} catch (error) {
-						log(`Axios failure with ${post.url}`, true);
-						return checkIfDone(post.name);
-					}
-
-					// With text/self posts, we want to download the top comments as well.
-					// This is done by requesting the post's JSON data, and then iterating through each comment.
-					// We also iterate through the top nested comments (only one level deep).
-					// So we have a file output with the post title, the post text, the author, and the top comments.
-
-					comments_string += post.title + ' by ' + post.author + '\n\n';
-					comments_string += post.selftext + '\n';
-					comments_string +=
-						'------------------------------------------------\n\n';
-					if (config.download_comments) {
-						// If the user wants to download comments
-						comments_string += '--COMMENTS--\n\n';
-						data[1].data.children.forEach((child) => {
-							const comment = child.data;
-							comments_string += comment.author + ':\n';
-							comments_string += comment.body + '\n';
-							if (comment.replies) {
-								const top_reply = comment.replies.data.children[0].data;
-								comments_string += '\t>\t' + top_reply.author + ':\n';
-								comments_string += '\t>\t' + top_reply.body + '\n';
-							}
-							comments_string += '\n\n\n';
-						});
-					}
-
-					fs.writeFile(
-						`${downloadDirectory}/${postTitleScrubbed}.txt`,
-						comments_string,
-						function (err) {
-							if (err) {
-								log(err, true);
-							}
-							downloadedPosts.self += 1;
-							if (checkIfDone(post.name)) {
-								return;
-							}
-						},
-					);
-				}
-			}
-		} else if (postType === 1) {
-			// DOWNLOAD A MEDIA POST
-			if (post.preview != undefined) {
-				// Reddit stores fallback URL previews for some GIFs.
-				// Changing the URL to download to the fallback URL will download the GIF, in MP4 format.
-				if (post.preview.reddit_video_preview != undefined) {
-					log(
-						"Using fallback URL for Reddit's GIF preview." +
-							post.preview.reddit_video_preview,
-						true,
-					);
-					downloadURL = post.preview.reddit_video_preview.fallback_url;
-					fileType = 'mp4';
-				} else if (post.url_overridden_by_dest.includes('.gifv')) {
-					// Luckily, you can just swap URLs on imgur with .gifv
-					// with ".mp4" to get the MP4 version. Amazing!
-					log('Replacing gifv with mp4', true);
-					downloadURL = post.url_overridden_by_dest.replace('.gifv', '.mp4');
-					fileType = 'mp4';
-				} else {
-					let sourceURL = post.preview.images[0].source.url;
-					// set fileType to whatever imageFormat item is in the sourceURL
-					for (let i = 0; i < imageFormats.length; i++) {
-						if (
-							sourceURL.toLowerCase().includes(imageFormats[i].toLowerCase())
-						) {
-							fileType = imageFormats[i];
-							break;
-						}
-					}
-				}
-			}
-			if (post.media != undefined && post.post_hint == 'hosted:video') {
-				// If the post has a media object, then it's a video.
-				// We need to get the URL from the media object.
-				// This is because the URL in the post object is a fallback URL.
-				// The media object has the actual URL.
-				downloadURL = post.media.reddit_video.fallback_url;
-				fileType = 'mp4';
-			} else if (
-				post.media != undefined &&
-				post.post_hint == 'rich:video' &&
-				post.media.oembed.thumbnail_url != undefined
-			) {
-				// Common for gfycat links
-				downloadURL = post.media.oembed.thumbnail_url;
-				fileType = 'gif';
-			}
-			if (!config.download_media_posts) {
-				log(`Skipping media post with title: ${post.title}`, true);
-				downloadedPosts.skipped_due_to_fileType += 1;
-				return checkIfDone(post.name);
-			} else {
-				let toDownload = await shouldWeDownload(
-					post.subreddit,
-					`${postTitleScrubbed}.${fileType}`,
-				);
-				if (!toDownload) {
-					downloadedPosts.skipped_due_to_duplicate += 1;
-					if (checkIfDone(post.name)) {
-						return;
-					}
-				} else {
-					downloadMediaFile(
-						downloadURL,
-						`${downloadDirectory}/${postTitleScrubbed}.${fileType}`,
-						post.name,
-					);
-				}
-			}
-		} else if (postType === 2) {
-			if (!config.download_link_posts) {
-				log(`Skipping link post with title: ${post.title}`, true);
-				downloadedPosts.skipped_due_to_fileType += 1;
-				return checkIfDone(post.name);
-			} else {
-				let toDownload = await shouldWeDownload(
-					post.subreddit,
-					`${postTitleScrubbed}.html`,
-				);
-				if (!toDownload) {
-					downloadedPosts.skipped_due_to_duplicate += 1;
-					if (checkIfDone(post.name)) {
-						return;
-					}
-				} else {
-					// DOWNLOAD A LINK POST
-					// With link posts, we create a simple HTML file that redirects to the post's URL.
-					// This enables the user to still "open" the link file, and it will redirect to the post.
-					// No comments or other data is stored.
-
-					if (
-						post.domain.includes('youtu') &&
-						config.download_youtube_videos_experimental
-					) {
-						log(
-							`Downloading ${postTitleScrubbed} from YouTube... This may take a while...`,
-							false,
-						);
-						let url = post.url;
-						try {
-							// Validate YouTube URL
-							if (!ytdl.validateURL(url)) {
-								throw new Error('Invalid YouTube URL');
-							}
-
-							// Get video info
-							const info = await ytdl.getInfo(url);
-							log(info, true);
-
-							// Choose the highest quality format available
-							const format = ytdl.chooseFormat(info.formats, {
-								quality: 'highest',
-							});
-
-							// Create a filename based on the video title
-							const fileName = `${postTitleScrubbed}.mp4`;
-
-							// Download audio stream
-							const audio = ytdl(url, { filter: 'audioonly' });
-							const audioPath = `${downloadDirectory}/${fileName}.mp3`;
-							audio.pipe(fs.createWriteStream(audioPath));
-
-							// Download video stream
-							const video = ytdl(url, { format });
-							const videoPath = `${downloadDirectory}/${fileName}.mp4`;
-							video.pipe(fs.createWriteStream(videoPath));
-
-							// Wait for both streams to finish downloading
-							await Promise.all([
-								new Promise((resolve) => audio.on('end', resolve)),
-								new Promise((resolve) => video.on('end', resolve)),
-							]);
-
-							// Merge audio and video using ffmpeg
-							ffmpeg()
-								.input(videoPath)
-								.input(audioPath)
-								.output(`${downloadDirectory}/${fileName}`)
-								.on('end', () => {
-									console.log('Download complete');
-									// Remove temporary audio and video files
-									fs.unlinkSync(audioPath);
-									fs.unlinkSync(videoPath);
-									downloadedPosts.link += 1;
-									if (checkIfDone(post.name)) {
-										return;
-									}
-								})
-								.run();
-						} catch (error) {
-							log(
-								`Failed to download ${postTitleScrubbed} from YouTube. Do you have FFMPEG installed? https://ffmpeg.org/ `,
-								false,
-							);
-							let htmlFile = `<html><body><script type='text/javascript'>window.location.href = "${post.url}";</script></body></html>`;
-
-							fs.writeFile(
-								`${downloadDirectory}/${postTitleScrubbed}.html`,
-								htmlFile,
-								function (err) {
-									if (err) throw err;
-									downloadedPosts.link += 1;
-									if (checkIfDone(post.name)) {
-										return;
-									}
-								},
-							);
-						}
-					} else {
-						let htmlFile = `<html><body><script type='text/javascript'>window.location.href = "${post.url}";</script></body></html>`;
-
-						fs.writeFile(
-							`${downloadDirectory}/${postTitleScrubbed}.html`,
-							htmlFile,
-							function (err) {
-								if (err) throw err;
-								downloadedPosts.link += 1;
-								if (checkIfDone(post.name)) {
-									return;
-								}
-							},
-						);
-					}
-				}
 			}
 		} else {
-			log('Failed to download: ' + post.title + 'with URL: ' + post.url, true);
-			downloadedPosts.failed += 1;
-			if (checkIfDone(post.name)) {
-				return;
+			await downloadMediaFile(
+				downloadUrl,
+				`${downloadDirectory}/${filePath}`,
+				post.name,
+			);
+		}
+	}
+}
+
+/**
+ * Downloads a self/text post with optional comments
+ */
+async function downloadSelfPost(post, postTitleScrubbed) {
+	const toDownload = await shouldWeDownload(
+		post.subreddit,
+		`${postTitleScrubbed}.txt`,
+	);
+
+	if (!toDownload) {
+		downloadedPosts.skipped_due_to_duplicate += 1;
+		return checkIfDone(post.name);
+	}
+
+	if (!config.download_self_posts) {
+		log(`Skipping self post with title: ${post.title}`, true);
+		downloadedPosts.skipped_due_to_fileType += 1;
+		return checkIfDone(post.name);
+	}
+
+	let postData;
+	try {
+		const postResponse = await axios.get(`${post.url}.json`, {
+			timeout: DEFAULT_REQUEST_TIMEOUT,
+		});
+		postData = postResponse.data;
+	} catch (error) {
+		log(`Failed to fetch post data: ${post.url}`, true);
+		return checkIfDone(post.name);
+	}
+
+	// Build post content with title, body, and optionally comments
+	let content = `${post.title} by ${post.author}\n\n`;
+	content += `${post.selftext}\n`;
+	content += '------------------------------------------------\n\n';
+
+	if (config.download_comments) {
+		content += '--COMMENTS--\n\n';
+		for (const child of postData[1].data.children) {
+			const comment = child.data;
+			content += `${comment.author}:\n${comment.body}\n`;
+			if (comment.replies?.data?.children?.[0]?.data) {
+				const topReply = comment.replies.data.children[0].data;
+				content += `\t>\t${topReply.author}:\n\t>\t${topReply.body}\n`;
+			}
+			content += '\n\n\n';
+		}
+	}
+
+	try {
+		await fsp.writeFile(
+			`${downloadDirectory}/${postTitleScrubbed}.txt`,
+			content,
+		);
+		downloadedPosts.self += 1;
+	} catch (err) {
+		log(err, true);
+	}
+	checkIfDone(post.name);
+}
+
+/**
+ * Determines the download URL and file type for a media post
+ */
+function getMediaDownloadInfo(post) {
+	let downloadURL = post.url;
+	let fileType = downloadURL.split('.').pop();
+
+	if (post.preview !== undefined) {
+		if (post.preview.reddit_video_preview !== undefined) {
+			log("Using fallback URL for Reddit's GIF preview.", true);
+			downloadURL = post.preview.reddit_video_preview.fallback_url;
+			fileType = 'mp4';
+		} else if (post.url_overridden_by_dest?.includes('.gifv')) {
+			log('Replacing gifv with mp4', true);
+			downloadURL = post.url_overridden_by_dest.replace('.gifv', '.mp4');
+			fileType = 'mp4';
+		} else if (post.preview.images?.[0]?.source?.url) {
+			const sourceURL = post.preview.images[0].source.url;
+			for (const format of MEDIA_FORMATS) {
+				if (sourceURL.toLowerCase().includes(format.toLowerCase())) {
+					fileType = format;
+					break;
+				}
 			}
 		}
-	} else {
-		log('Failed to download: ' + post.title + 'with URL: ' + post.url, true);
-		downloadedPosts.failed += 1;
-		if (checkIfDone(post.name)) {
-			return;
+	}
+
+	if (post.media !== undefined && post.post_hint === 'hosted:video') {
+		downloadURL = post.media.reddit_video.fallback_url;
+		fileType = 'mp4';
+	} else if (
+		post.media !== undefined &&
+		post.post_hint === 'rich:video' &&
+		post.media.oembed?.thumbnail_url !== undefined
+	) {
+		downloadURL = post.media.oembed.thumbnail_url;
+		fileType = 'gif';
+	}
+
+	return { downloadURL, fileType };
+}
+
+/**
+ * Downloads a media post (image/video)
+ */
+async function downloadMediaPost(post, postTitleScrubbed) {
+	if (!config.download_media_posts) {
+		log(`Skipping media post with title: ${post.title}`, true);
+		downloadedPosts.skipped_due_to_fileType += 1;
+		return checkIfDone(post.name);
+	}
+
+	const { downloadURL, fileType } = getMediaDownloadInfo(post);
+
+	const toDownload = await shouldWeDownload(
+		post.subreddit,
+		`${postTitleScrubbed}.${fileType}`,
+	);
+
+	if (!toDownload) {
+		downloadedPosts.skipped_due_to_duplicate += 1;
+		return checkIfDone(post.name);
+	}
+
+	await downloadMediaFile(
+		downloadURL,
+		`${downloadDirectory}/${postTitleScrubbed}.${fileType}`,
+		post.name,
+	);
+}
+
+/**
+ * Downloads a YouTube video with audio using ffmpeg
+ */
+async function downloadYouTubeVideo(post, postTitleScrubbed) {
+	log(
+		`Downloading ${postTitleScrubbed} from YouTube... This may take a while...`,
+		false,
+	);
+
+	try {
+		if (!ytdl.validateURL(post.url)) {
+			throw new Error('Invalid YouTube URL');
 		}
+
+		const info = await ytdl.getInfo(post.url);
+		const format = ytdl.chooseFormat(info.formats, { quality: 'highest' });
+		const fileName = `${postTitleScrubbed}.mp4`;
+		const audioPath = `${downloadDirectory}/${fileName}.mp3`;
+		const videoPath = `${downloadDirectory}/${fileName}.mp4`;
+
+		// Download audio and video streams
+		const audio = ytdl(post.url, { filter: 'audioonly' });
+		audio.pipe(fs.createWriteStream(audioPath));
+
+		const video = ytdl(post.url, { format });
+		video.pipe(fs.createWriteStream(videoPath));
+
+		await Promise.all([
+			new Promise((resolve) => audio.on('end', resolve)),
+			new Promise((resolve) => video.on('end', resolve)),
+		]);
+
+		// Merge with ffmpeg
+		await new Promise((resolve, reject) => {
+			ffmpeg()
+				.input(videoPath)
+				.input(audioPath)
+				.output(`${downloadDirectory}/${fileName}`)
+				.on('end', () => {
+					fs.unlinkSync(audioPath);
+					fs.unlinkSync(videoPath);
+					resolve();
+				})
+				.on('error', reject)
+				.run();
+		});
+
+		downloadedPosts.link += 1;
+		checkIfDone(post.name);
+		return true;
+	} catch (error) {
+		log(
+			`Failed to download ${postTitleScrubbed} from YouTube. Do you have FFMPEG installed? https://ffmpeg.org/`,
+			false,
+		);
+		return false;
+	}
+}
+
+/**
+ * Downloads a link post (creates HTML redirect or downloads YouTube video)
+ */
+async function downloadLinkPost(post, postTitleScrubbed) {
+	if (!config.download_link_posts) {
+		log(`Skipping link post with title: ${post.title}`, true);
+		downloadedPosts.skipped_due_to_fileType += 1;
+		return checkIfDone(post.name);
+	}
+
+	const toDownload = await shouldWeDownload(
+		post.subreddit,
+		`${postTitleScrubbed}.html`,
+	);
+
+	if (!toDownload) {
+		downloadedPosts.skipped_due_to_duplicate += 1;
+		return checkIfDone(post.name);
+	}
+
+	// Try YouTube download if enabled and applicable
+	if (
+		post.domain.includes('youtu') &&
+		config.download_youtube_videos_experimental
+	) {
+		const success = await downloadYouTubeVideo(post, postTitleScrubbed);
+		if (success) return;
+	}
+
+	// Create HTML redirect file
+	const htmlFile = `<html><body><script type='text/javascript'>window.location.href = "${post.url}";</script></body></html>`;
+	await fsp.writeFile(
+		`${downloadDirectory}/${postTitleScrubbed}.html`,
+		htmlFile,
+	);
+	downloadedPosts.link += 1;
+	checkIfDone(post.name);
+}
+
+/**
+ * Main function to download a post based on its type
+ */
+async function downloadPost(post) {
+	const postTypeOptions = ['self', 'media', 'link', 'poll', 'gallery'];
+	const postType = getPostType(post, postTypeOptions);
+	const postTitleScrubbed = getFileName(post);
+
+	switch (postType) {
+		case 4: // Gallery
+			return downloadGalleryPost(post, postTitleScrubbed);
+
+		case 0: // Self/text post
+			return downloadSelfPost(post, postTitleScrubbed);
+
+		case 1: // Media (image/video)
+			return downloadMediaPost(post, postTitleScrubbed);
+
+		case 2: // Link
+			return downloadLinkPost(post, postTitleScrubbed);
+
+		case 3: // Poll (unsupported)
+			log(`Skipping poll post: ${post.title}`, true);
+			downloadedPosts.skipped_due_to_fileType += 1;
+			return checkIfDone(post.name);
+
+		default:
+			if (post.url === undefined) {
+				log(`Failed to download: ${post.title} - no URL`, true);
+			} else {
+				log(`Failed to download: ${post.title} with URL: ${post.url}`, true);
+			}
+			downloadedPosts.failed += 1;
+			return checkIfDone(post.name);
 	}
 }
 
@@ -1068,11 +924,6 @@ function shouldWeDownload(subreddit, postTitleWithPrefixAndExtension) {
 		);
 		return !postExists;
 	}
-}
-
-function onErr(err) {
-	log(err, true);
-	return 1;
 }
 
 // checkIfDone is called frequently to see if we have downloaded the number of posts
@@ -1122,7 +973,8 @@ function checkIfDone(lastPostId, override) {
 				currentAPICall.data.children[responseSize - 1].data.name) ||
 		numberOfPostsRemaining()[0] === 0 ||
 		override ||
-		(numberOfPostsRemaining()[1] === responseSize && responseSize < 100)
+		(numberOfPostsRemaining()[1] === responseSize &&
+			responseSize < MAX_POSTS_PER_REQUEST)
 	) {
 		let endTime = new Date();
 		let timeDiff = endTime - startTime;
@@ -1130,21 +982,14 @@ function checkIfDone(lastPostId, override) {
 		let msPerPost = (timeDiff / numberOfPostsRemaining()[1])
 			.toString()
 			.substring(0, 5);
-		if (numberOfPosts >= 99999999999999999999) {
-			log(
-				`Still downloading posts from ${chalk.cyan(
-					subredditList[currentSubredditIndex],
-				)}... (${numberOfPostsRemaining()[1]}/all)`,
-				false,
-			);
-		} else {
-			log(
-				`Still downloading posts from ${chalk.cyan(
-					subredditList[currentSubredditIndex],
-				)}... (${numberOfPostsRemaining()[1]}/${numberOfPosts})`,
-				false,
-			);
-		}
+		const [remaining, downloaded] = numberOfPostsRemaining();
+		const total = numberOfPosts >= ALL_POSTS ? 'all' : numberOfPosts;
+		log(
+			`Still downloading posts from ${chalk.cyan(
+				subredditList[currentSubredditIndex],
+			)}... (${downloaded}/${total})`,
+			false,
+		);
 		if (numberOfPostsRemaining()[0] === 0) {
 			log('Validating that all posts were downloaded...', false);
 			setTimeout(() => {
@@ -1193,21 +1038,14 @@ function checkIfDone(lastPostId, override) {
 			}, 1000);
 		}
 	} else {
-		if (numberOfPosts >= 99999999999999999999) {
-			log(
-				`Still downloading posts from ${chalk.cyan(
-					subredditList[currentSubredditIndex],
-				)}... (${numberOfPostsRemaining()[1]}/all)`,
-				false,
-			);
-		} else {
-			log(
-				`Still downloading posts from ${chalk.cyan(
-					subredditList[currentSubredditIndex],
-				)}... (${numberOfPostsRemaining()[1]}/${numberOfPosts})`,
-				false,
-			);
-		}
+		const [remaining, downloaded] = numberOfPostsRemaining();
+		const total = numberOfPosts >= ALL_POSTS ? 'all' : numberOfPosts;
+		log(
+			`Still downloading posts from ${chalk.cyan(
+				subredditList[currentSubredditIndex],
+			)}... (${downloaded}/${total})`,
+			false,
+		);
 
 		for (let i = 0; i < Object.keys(downloadedPosts).length; i++) {
 			log(
@@ -1219,7 +1057,7 @@ function checkIfDone(lastPostId, override) {
 		}
 		log('\n', true);
 
-		if (numberOfPostsRemaining()[1] % 100 == 0) {
+		if (numberOfPostsRemaining()[1] % MAX_POSTS_PER_REQUEST === 0) {
 			return downloadSubredditPosts(
 				subredditList[currentSubredditIndex],
 				lastPostId,
@@ -1236,7 +1074,7 @@ function getFileName(post) {
 		config.file_naming_scheme.showDate === undefined
 	) {
 		let timestamp = post.created;
-		var date = new Date(timestamp * 1000);
+		const date = new Date(timestamp * 1000);
 		var year = date.getFullYear();
 		var month = (date.getMonth() + 1).toString().padStart(2, '0');
 		var day = date.getDate().toString().padStart(2, '0');
@@ -1271,17 +1109,12 @@ function getFileName(post) {
 	// remove special chars from name
 	fileName = fileName.replace(/(?:\r\n|\r|\n|\t)/g, '');
 
-	if (fileName.search(/\ufe0e/g) >= -1) {
-		fileName = fileName.replace(/\ufe0e/g, '');
-	}
+	fileName = fileName.replace(/\ufe0e/g, '');
+	fileName = fileName.replace(/\ufe0f/g, '');
 
-	if (fileName.search(/\ufe0f/g) >= -1) {
-		fileName = fileName.replace(/\ufe0f/g, '');
-	}
-
-	// The max length for most systems is about 255. To give some wiggle room, I'm doing 240
-	if (fileName.length > 240) {
-		fileName = fileName.substring(0, 240);
+	// The max length for most systems is about 255. To give some wiggle room, we use 240
+	if (fileName.length > MAX_FILENAME_LENGTH) {
+		fileName = fileName.substring(0, MAX_FILENAME_LENGTH);
 	}
 
 	return fileName;
@@ -1328,7 +1161,7 @@ function log(message, detailed) {
 			logFileName += `${subredditListString} - `;
 		}
 		if (config.local_logs_naming_scheme.showNumberOfPosts) {
-			if (numberOfPosts < 999999999999999999) {
+			if (numberOfPosts >= ALL_POSTS) {
 				logFileName += `ALL - `;
 			} else {
 				logFileName += `${numberOfPosts} - `;
@@ -1339,13 +1172,11 @@ function log(message, detailed) {
 			logFileName = logFileName.substring(0, logFileName.length - 3);
 		}
 
-		fs.writeFile(
-			`./logs/${logFileName}.${logFormat}`,
-			userLogs,
-			function (err) {
-				if (err) throw err;
-			},
-		);
+		fsp
+			.writeFile(`./logs/${logFileName}.${logFormat}`, userLogs)
+			.catch((err) => {
+				console.error('Failed to write log file:', err);
+			});
 	}
 }
 
