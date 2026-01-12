@@ -20,7 +20,6 @@ const {
 	DEFAULT_REQUEST_TIMEOUT,
 } = require('../lib/utils');
 
-// Test configuration
 const TEST_DOWNLOAD_DIR = path.join(__dirname, '../downloads_test');
 const TEST_CONFIG = {
 	file_naming_scheme: {
@@ -32,10 +31,8 @@ const TEST_CONFIG = {
 	},
 };
 
-// Increase timeout for network requests
 jest.setTimeout(60000);
 
-// Helper to make Reddit API requests
 async function fetchRedditPosts(subreddit, limit = 5, sorting = 'top', time = 'month') {
 	const url = buildRedditApiUrl({
 		target: subreddit,
@@ -55,7 +52,6 @@ async function fetchRedditPosts(subreddit, limit = 5, sorting = 'top', time = 'm
 	return response.data.data.children.map((child) => child.data);
 }
 
-// Helper to fetch a single post by URL
 async function fetchSinglePost(postUrl) {
 	const response = await axios.get(`${postUrl}.json`, {
 		timeout: DEFAULT_REQUEST_TIMEOUT,
@@ -67,7 +63,6 @@ async function fetchSinglePost(postUrl) {
 	return response.data[0].data.children[0].data;
 }
 
-// Helper to download a file
 async function downloadFile(url, destPath) {
 	const response = await axios({
 		method: 'GET',
@@ -88,16 +83,13 @@ async function downloadFile(url, destPath) {
 	});
 }
 
-// Setup and teardown
 beforeAll(() => {
-	// Create test download directory
 	if (!fs.existsSync(TEST_DOWNLOAD_DIR)) {
 		fs.mkdirSync(TEST_DOWNLOAD_DIR, { recursive: true });
 	}
 });
 
 afterAll(() => {
-	// Clean up test downloads
 	if (fs.existsSync(TEST_DOWNLOAD_DIR)) {
 		fs.rmSync(TEST_DOWNLOAD_DIR, { recursive: true, force: true });
 	}
@@ -129,7 +121,6 @@ describe('Reddit API Integration', () => {
 		expect(topPosts.length).toBeGreaterThan(0);
 		expect(newPosts.length).toBeGreaterThan(0);
 
-		// Top posts should generally have higher scores
 		expect(topPosts[0].score).toBeGreaterThan(0);
 	});
 
@@ -144,7 +135,6 @@ describe('Post Type Detection (Real Posts)', () => {
 	test('correctly identifies image posts from r/pics', async () => {
 		const posts = await fetchRedditPosts('pics', 10, 'top', 'month');
 
-		// Find an image post
 		const imagePost = posts.find((post) => {
 			const type = getPostType(post);
 			return type === 1; // media
@@ -159,7 +149,6 @@ describe('Post Type Detection (Real Posts)', () => {
 	test('correctly identifies self/text posts from r/AskReddit', async () => {
 		const posts = await fetchRedditPosts('AskReddit', 5, 'top', 'week');
 
-		// AskReddit is mostly self posts
 		const selfPost = posts.find((post) => getPostType(post) === 0);
 
 		if (selfPost) {
@@ -171,7 +160,6 @@ describe('Post Type Detection (Real Posts)', () => {
 	test('correctly identifies link posts from r/technology', async () => {
 		const posts = await fetchRedditPosts('technology', 10, 'top', 'week');
 
-		// Technology often has link posts
 		const linkPost = posts.find((post) => getPostType(post) === 2);
 
 		if (linkPost) {
@@ -188,14 +176,11 @@ describe('File Naming (Real Posts)', () => {
 		for (const post of posts) {
 			const fileName = getFileName(post, TEST_CONFIG);
 
-			// Should not contain invalid characters
 			expect(fileName).not.toMatch(/[/\\?%*:|"<>]/);
 
-			// Should contain expected parts
 			expect(fileName).toContain(post.subreddit);
 			expect(fileName).toContain(post.author);
 
-			// Should be reasonable length
 			expect(fileName.length).toBeLessThanOrEqual(240);
 		}
 	});
@@ -203,11 +188,9 @@ describe('File Naming (Real Posts)', () => {
 	test('handles posts with special characters in title', async () => {
 		const posts = await fetchRedditPosts('news', 10);
 
-		// News posts often have special characters
 		for (const post of posts) {
 			const fileName = getFileName(post, TEST_CONFIG);
 
-			// Should not throw and should produce valid filename
 			expect(typeof fileName).toBe('string');
 			expect(fileName.length).toBeGreaterThan(0);
 			expect(fileName).not.toMatch(/[/\\?%*:|"<>]/);
@@ -219,7 +202,6 @@ describe('Media Download Info (Real Posts)', () => {
 	test('extracts download info from image posts', async () => {
 		const posts = await fetchRedditPosts('pics', 10);
 
-		// Find an actual image post
 		const imagePost = posts.find(
 			(post) => getPostType(post) === 1 && post.url,
 		);
@@ -238,7 +220,6 @@ describe('Actual File Downloads', () => {
 	test('can download an image from Reddit', async () => {
 		const posts = await fetchRedditPosts('pics', 20, 'top', 'month');
 
-		// Find a direct image link
 		const imagePost = posts.find(
 			(post) =>
 				post.url &&
@@ -253,10 +234,8 @@ describe('Actual File Downloads', () => {
 
 			await downloadFile(imagePost.url, filePath);
 
-			// Verify file was created
 			expect(fs.existsSync(filePath)).toBe(true);
 
-			// Verify file has content
 			const stats = fs.statSync(filePath);
 			expect(stats.size).toBeGreaterThan(0);
 
@@ -269,7 +248,6 @@ describe('Actual File Downloads', () => {
 	test('can download from i.redd.it domain', async () => {
 		const posts = await fetchRedditPosts('pics', 30, 'hot');
 
-		// Find a post from i.redd.it
 		const redditImagePost = posts.find(
 			(post) => post.domain === 'i.redd.it' && post.url,
 		);
@@ -338,7 +316,6 @@ describe('Actual File Downloads', () => {
 
 describe('User Profile Downloads', () => {
 	test('can fetch posts from a user profile', async () => {
-		// Use a known active user (Reddit's official account)
 		const url = buildRedditApiUrl({
 			target: 'reddit',
 			isUser: true,
@@ -363,7 +340,6 @@ describe('User Profile Downloads', () => {
 
 describe('Gallery Post Detection', () => {
 	test('can identify gallery posts', async () => {
-		// Try to find gallery posts in a subreddit known for them
 		const posts = await fetchRedditPosts('itookapicture', 20, 'top', 'month');
 
 		const galleryPost = posts.find((post) => post.is_gallery === true);
@@ -395,10 +371,9 @@ describe('Error Handling', () => {
 	});
 
 	test('handles timeout appropriately', async () => {
-		// This should timeout with an extremely short timeout
 		await expect(
 			axios.get('https://www.reddit.com/r/pics/top/.json', {
-				timeout: 1, // 1ms timeout - will definitely fail
+				timeout: 1,
 				headers: { 'User-Agent': 'RedditDownloaderTest/1.0' },
 			}),
 		).rejects.toThrow();
@@ -417,7 +392,6 @@ describe('Rate Limiting Awareness', () => {
 				count: posts.length,
 			});
 
-			// Small delay between requests to be respectful
 			await new Promise((resolve) => setTimeout(resolve, 500));
 		}
 
