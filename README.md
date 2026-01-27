@@ -97,6 +97,11 @@ Contribute @ https://github.com/josephrcox/easy-reddit-downloader
 ```
 Note: at this time, comments from a specific user are not supported. If you would like this, please submit an issue with the `enhancement` tag. 
 
+## Downloading from a search query
+
+To download search results, enter your search query in this format when asked what subreddits you would like to download: `search:subreddit:aww (cats AND dogs) OR birds`.
+The search query can contain any of the search modifiers shown on [this webpage](https://support.reddithelp.com/hc/en-us/articles/19696541895316-Available-search-features) and should appear exactly as it would in the Reddit search bar, but with `search:` prepended to the query.
+
 ## Downloading from a post list (download specific URLs)
 With version v0.2.1, I added the ability to download specific posts from a list of URLs.
 
