@@ -338,6 +338,32 @@ describe('User Profile Downloads', () => {
 	});
 });
 
+describe('Search Query Downloads', () => {
+	test('can fetch posts from a search query', async () => {
+		const query = 'search:subreddit:aww cats AND cute';
+		const url = buildRedditApiUrl({
+			target: query,
+			isUser: false,
+			isSearch: true,
+			sorting: 'new',
+			time: 'all',
+			limit: 5,
+		});
+
+		const response = await axios.get(url, {
+			timeout: DEFAULT_REQUEST_TIMEOUT,
+			headers: {
+				'User-Agent': 'RedditDownloaderTest/1.0',
+			},
+		});
+
+		const posts = response.data.data.children.map((child) => child.data);
+
+		expect(posts.length).toBeGreaterThan(0);
+		expect(posts[0]).toHaveProperty('title');
+	});
+});
+
 describe('Gallery Post Detection', () => {
 	test('can identify gallery posts', async () => {
 		const posts = await fetchRedditPosts('itookapicture', 20, 'top', 'month');
